@@ -1,0 +1,19 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "C:/Program Files/Eclipse Adoptium/jdk-17.0.16.8-hotspot/include",
+                "C:/Program Files/Eclipse Adoptium/jdk-17.0.16.8-hotspot/include/win32"
+            ],
+            "defines": [],
+            "windowsSdkVersion": "10.0.22621.0",
+            "compilerPath": "C:/path/to/g++.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-gcc-x64"
+        }
+    ],
+    "version": 4
+}
