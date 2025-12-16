@@ -459,11 +459,11 @@ class HomePanel extends JPanel {
 
             g2.setColor(Theme.TEXT);
             g2.setFont(getFont().deriveFont(Font.BOLD, 32f));
-            g2.drawString("SmartCampus DSA System", 32, 78);
+            g2.drawString("Campus Connect", 32, 78);
 
             g2.setFont(getFont().deriveFont(Font.PLAIN, 14f));
             g2.setColor(Theme.MUTED);
-            g2.drawString("Unified Java GUI + C++ DSAs connected via JNI", 32, 108);
+            g2.drawString("SmartCampus DSA system • Java GUI + C++ DSAs via JNI", 32, 108);
 
             g2.setFont(getFont().deriveFont(Font.BOLD, 12.5f));
             g2.setColor(Theme.OK);
