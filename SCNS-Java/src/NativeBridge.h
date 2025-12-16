@@ -7,22 +7,21 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-/*
- * Class:     NativeBridge
- * Method:    testConnection
- * Signature: ()Ljava/lang/String;
- */
-JNIEXPORT jstring JNICALL Java_NativeBridge_testConnection
-  (JNIEnv *, jobject);
-
-/*
- * Class:     NativeBridge
- * Method:    getShortestPath
- * Signature: (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
- */
-JNIEXPORT jstring JNICALL Java_NativeBridge_getShortestPath
-  (JNIEnv *, jobject, jstring, jstring);
-
+JNIEXPORT jstring JNICALL Java_NativeBridge_testConnection(JNIEnv *, jobject);
+JNIEXPORT void JNICALL Java_NativeBridge_seedDemoData(JNIEnv *, jobject);
+JNIEXPORT jstring JNICALL Java_NativeBridge_getShortestPath(JNIEnv *, jobject, jstring, jstring);
+JNIEXPORT jobjectArray JNICALL Java_NativeBridge_navLocations(JNIEnv *, jobject);
+JNIEXPORT jstring JNICALL Java_NativeBridge_navShortestPath(JNIEnv *, jobject, jstring, jstring, jstring);
+JNIEXPORT jstring JNICALL Java_NativeBridge_sisUpsertStudent(JNIEnv *, jobject, jint, jstring, jstring, jint);
+JNIEXPORT jstring JNICALL Java_NativeBridge_sisGetStudent(JNIEnv *, jobject, jint);
+JNIEXPORT jstring JNICALL Java_NativeBridge_sisDeleteStudent(JNIEnv *, jobject, jint);
+JNIEXPORT jstring JNICALL Java_NativeBridge_sisListStudents(JNIEnv *, jobject);
+JNIEXPORT jstring JNICALL Java_NativeBridge_sisTreeSnapshot(JNIEnv *, jobject);
+JNIEXPORT jstring JNICALL Java_NativeBridge_attRegisterStudent(JNIEnv *, jobject, jint, jstring);
+JNIEXPORT jstring JNICALL Java_NativeBridge_attNewSessionDay(JNIEnv *, jobject);
+JNIEXPORT jstring JNICALL Java_NativeBridge_attMarkPresent(JNIEnv *, jobject, jint);
+JNIEXPORT jstring JNICALL Java_NativeBridge_attGetSummary(JNIEnv *, jobject, jint);
+JNIEXPORT jstring JNICALL Java_NativeBridge_attGetDefaulters(JNIEnv *, jobject, jint);
 #ifdef __cplusplus
 }
 #endif

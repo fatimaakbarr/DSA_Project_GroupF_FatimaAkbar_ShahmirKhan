@@ -1,120 +1,146 @@
-# SmartCampus DSA Project
+## SmartCampus DSA Project
 
-A Data Structures & Algorithms course project built using **Java (Frontend GUI)** and **C++ (Backend DSA processing)**.  
-The system runs as a unified application using **JNI (Java Native Interface)** to bridge Java ↔ C++ directly.
+A **Data Structures & Algorithms** final project built as **one unified application**:
+
+- **Java (Swing GUI)**: interaction, validation, visualization
+- **C++ (Core DSAs + Algorithms)**: all data processing, storage, and logic
+- **JNI (Java Native Interface)**: direct Java ↔ C++ bridging (no separate mini-programs)
 
 ---
 
-## 👥 Group Members
+### Group Members (2 Students)
 
 | Name | Role / Contributions |
-|------|--------------------|
-| **Fatima Akbar** | Lead developer: Oversees module integration, implements most Level-1 and Level-2 DSAs, sets up JNI bridges, designs Java GUI screens |
-| **Shahmir Khan** | Support developer: Implements secondary DSA operations, assists in GUI development, handles testing and debugging for each module |
+|---|---|
+| **Fatima Akbar** | Lead developer: module integration, core DSAs, JNI bridges, Java UI screens |
+| **Shahmir Khan** | Support developer: secondary DSA operations, assists in GUI, testing & debugging |
 
 ---
 
-## 🔥 System Modules
+### Modules (Integrated)
 
-| Module | Level-1 DSA | Level-2 DSA | Functionality | Primary Contributor |
-|-------|-------------|-------------|--------------|------------------|
-| Campus Navigator | Linked List / Hash Map | Graph + BFS / Dijkstra | Finds shortest path inside campus | Fatima Akbar |
-| Student Information System | Searching + Sorting | AVL Tree | Insert, search, and update student records | Fatima Akbar |
-| Attendance Management | Array / Queue | Min-Heap / Priority Queue | Marks attendance & alerts shortages | Shahmir Khan (assisted by Fatima) |
-
-**Notes:**  
-- Each module contains a Java GUI screen for input and display.  
-- Each module implements required DSA logic in C++.  
-- Integration between Java ↔ C++ is handled using JNI.  
+| Module | Level‑1 DSA(s) | Level‑2 DSA(s) | What it does |
+|---|---|---|---|
+| **Campus Navigator** | Linked List, Hash Map, Queue | Graph + BFS / Dijkstra | Shortest route between campus locations + live visualization |
+| **Student Information System** | Searching/Sorting (listing) | AVL Tree | Insert/search/update/delete students + AVL visualization |
+| **Attendance Management** | Array / Queue, Hash Map | Min‑Heap / Priority Queue | Mark attendance, compute %, list defaulters (min‑heap priority) |
 
 ---
 
-## 🧠 Technology Stack
+### DSA Usage (Per Module)
 
-| Component | Used For |
-|-----------|-----------|
-| **Java Swing (NetBeans Project)** | GUI/User interaction |
-| **C++ Backend** | All core DSA implementations |
-| **JNI Integration** | Direct Java → C++ function calls |
-| **GitHub** | Version tracking & collaboration |
+#### Campus Navigator (C++: `graph.cpp`, `graph.h`)
+- **Level‑1: Linked List**: adjacency list storage (fast edge iteration, memory-efficient)
+- **Level‑1: Hash Map**: location name → node index lookup (fast O(1) average)
+- **Level‑1: Queue**: BFS traversal order
+- **Level‑2: Graph + Algorithms**:
+  - **BFS**: shortest path by *number of hops*
+  - **Dijkstra** (with custom Min‑Heap priority queue): shortest weighted path
 
----
+Operations used: insert nodes/edges, traverse, BFS, Dijkstra, path reconstruction.
 
-## 📁 Project Structure
+#### Student Information System (C++: `avl_tree.cpp`, `avl_tree.h`)
+- **Level‑2: AVL Tree**: self-balancing BST for fast search/insert/delete (O(log n))
+- **Level‑1: Searching/Sorting**: sorted listing by inorder traversal (and prepared sorting helpers)
 
-SmartCampus-DSA-Project/
-│── README.md
-│
-├── SCNS-Java/ # NetBeans Java GUI Project
-│ └── src/
-│ ├── MainMenu.java
-│ ├── NativeBridge.java <- JNI native method declarations
-│ ├── NavigatorUI.java
-│ ├── StudentInfoUI.java
-│ └── AttendanceUI.java
-│
-└── Cpp-Native/ # C++ backend & JNI implementation
-├── native_impl.cpp <- Implements JNI functions
-├── graph.cpp <- Dijkstra/BFS for Campus Navigator
-├── avl_tree.cpp <- Student records management
-├── heap_attendance.cpp <- Attendance module
-└── build.bat/.sh <- Build shared library
+Operations used: insert, update (upsert), search, delete, inorder traversal, rotations.
 
-arduino
-Copy code
+#### Attendance Management (C++: `heap_attendance.cpp`, `heap_attendance.h`)
+- **Level‑1: Array**: stores student attendance entries
+- **Level‑1: Queue**: attendance mark events (supports batching/visual feedback)
+- **Level‑1: Hash Map**: roll → entry index lookup
+- **Level‑2: Min‑Heap**: defaulters list (pull lowest attendance quickly)
+
+Operations used: enqueue attendance mark, increment totals, heap push/pop, filtering.
 
 ---
 
-## 🔗 Java ↔ C++ Integration (JNI)
+### Integration Layer (Java ↔ C++ via JNI)
 
-Native Java methods:
+**Flow (all modules):**
 
-```java
-public native String getShortestPath(String src, String dest);
-public native String addStudent(String name, int roll);
-public native String checkAttendance(int roll);
-Integration Flow:
+1. Java GUI validates user input.
+2. Java calls a `native` method in `NativeBridge.java`.
+3. C++ processes data using DSAs/algorithms.
+4. C++ returns results as compact JSON strings (or `String[]` for locations).
+5. Java parses results and updates UI/visualizations.
 
-Java GUI collects input from user.
+JNI entry points are implemented in **`Cpp-Native/native_impl.cpp`**.
 
-Input is sent via JNI to corresponding C++ function.
+---
 
-C++ backend processes data using DSAs and returns results.
+### Project Structure
 
-Java GUI displays output and provides feedback/errors.
+```
+/workspace
+  /SCNS-Java/src
+    MainMenu.java               (entry point)
+    NativeBridge.java           (JNI native methods)
+    SmartCampusFrame.java       (main animated UI shell)
+    NavigatorUI.java            (module UI)
+    StudentInfoUI.java          (module UI)
+    AttendanceUI.java           (module UI)
+    GraphView.java              (route visualization)
+    TreeView.java               (AVL visualization)
+    ProgressRing.java           (attendance visualization)
+    Theme.java, Anim.java, Toast.java, JsonMini.java, ModernButton.java
 
-🛠 How to Run
-Clone Repository:
+  /Cpp-Native
+    build.sh                    (Linux build)
+    native_impl.cpp             (JNI layer)
+    graph.cpp / graph.h         (Navigator DSAs)
+    avl_tree.cpp / avl_tree.h   (Student DSAs)
+    heap_attendance.cpp/.h      (Attendance DSAs)
+    dsa_level1.h                (LinkedList/HashMap/Queue)
+    dsa_min_heap.h              (MinHeap)
+    utils_json.cpp/.h           (JSON helpers)
 
-bash
-Copy code
-git clone https://github.com/<your-org>/DSA_Project_GroupX_FatimaAkbar_ShahmirKhan.git
-cd SmartCampus-DSA-Project
-Build C++ JNI Library:
+  run.sh                        (build + run)
+```
 
-Run build.bat (Windows) or build.sh (Linux/macOS) to compile the shared library.
+---
 
-Run Java GUI:
+### How to Run (Linux)
 
-bash
-Copy code
-cd SCNS-Java/src
-javac *.java
-java MainMenu
-Ensure the compiled C++ shared library is in the correct path for JNI to load.
+1) **Build C++ JNI library**
 
-📊 GitHub Collaboration
-Both students contributed actively.
+```bash
+./Cpp-Native/build.sh
+```
 
-Branches were used for feature development and old JNI versions.
+2) **Compile Java**
 
-Fatima Akbar led core development and module integration; Shahmir Khan implemented secondary DSAs, assisted in GUI, and tested modules.
+```bash
+javac SCNS-Java/src/*.java
+```
 
-Commit history clearly reflects contributions for Level-1 and Level-2 DSAs per student.
+3) **Run** (run from repo root so JNI can find `./Cpp-Native/libcampus_backend.so`)
 
-Note for Instructor:
+```bash
+java -cp SCNS-Java/src MainMenu
+```
 
-Old non-working JNI version is available in branch old-jni.
+Or use the one-shot helper:
 
-Current working version is in main branch.
+```bash
+./run.sh
+```
 
+---
+
+### Work Allocation (Per Module)
+
+- **Campus Navigator**
+  - Lead: **Fatima Akbar**
+  - Assist: **Shahmir Khan**
+  - DSA focus: Graph + BFS/Dijkstra, linked-list adjacency, hash map mapping, JNI methods, UI visualization
+
+- **Student Information System**
+  - Lead: **Fatima Akbar**
+  - Assist: **Shahmir Khan**
+  - DSA focus: AVL insert/search/update/delete + visualization + JNI integration
+
+- **Attendance Management**
+  - Lead: **Shahmir Khan**
+  - Assist: **Fatima Akbar**
+  - DSA focus: Queue/array tracking, min-heap defaulters, JNI methods, UI + testing
