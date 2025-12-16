@@ -1,6 +1,10 @@
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.GridLayout;
+import java.awt.Insets;
 import java.util.List;
 import java.util.Map;
 
@@ -82,12 +86,26 @@ public class AttendanceUI extends JPanel {
         p.setOpaque(false);
 
         JPanel controls = new CardPanel();
-        controls.setLayout(null);
+        controls.setLayout(new GridBagLayout());
 
         ModernButton newDay = new ModernButton("New Day", Theme.CARD, Theme.CARD_2);
         ModernButton present = new ModernButton("Mark Present", Theme.ACCENT, Theme.ACCENT_2);
         ModernButton summary = new ModernButton("Get Summary", Theme.CARD, Theme.CARD_2);
         ModernButton defaulters = new ModernButton("Show Defaulters", Theme.DANGER, Theme.ACCENT);
+
+        // Labels + explanation
+        JLabel lRoll = label("Roll Number");
+        JLabel lThr = label("Defaulter Threshold (%)");
+        JLabel hint = new JLabel(
+                "<html><b>New Day</b> = adds 1 lecture to everyone (Total++)<br/>"
+                        + "<b>Mark Present</b> = marks this roll present for the current day (Present++)<br/>"
+                        + "<b>Get Summary</b> = shows this roll's attendance % (ring)<br/>"
+                        + "<b>Show Defaulters</b> = list students below threshold (min-heap priority)</html>");
+        hint.setForeground(Theme.MUTED);
+        hint.setFont(hint.getFont().deriveFont(Font.PLAIN, 12f));
+
+        roll.setToolTipText("Enter student roll number. Example: 101");
+        threshold.setToolTipText("Students below this % are shown as defaulters. Example: 75");
 
         newDay.addActionListener(e -> {
             Map<String, String> o = JsonMini.obj(nb.attNewSessionDay());
@@ -97,12 +115,40 @@ public class AttendanceUI extends JPanel {
         summary.addActionListener(e -> showSummary());
         defaulters.addActionListener(e -> showDefaulters());
 
-        controls.add(roll);
-        controls.add(newDay);
-        controls.add(present);
-        controls.add(summary);
-        controls.add(threshold);
-        controls.add(defaulters);
+        JPanel buttons = new JPanel(new GridLayout(2, 2, 10, 10));
+        buttons.setOpaque(false);
+        buttons.add(newDay);
+        buttons.add(present);
+        buttons.add(summary);
+        buttons.add(defaulters);
+
+        GridBagConstraints gc = new GridBagConstraints();
+        gc.gridx = 0;
+        gc.gridy = 0;
+        gc.weightx = 1;
+        gc.fill = GridBagConstraints.HORIZONTAL;
+        gc.insets = new Insets(10, 12, 4, 12);
+        controls.add(lRoll, gc);
+
+        gc.gridy++;
+        gc.insets = new Insets(0, 12, 10, 12);
+        controls.add(roll, gc);
+
+        gc.gridy++;
+        gc.insets = new Insets(2, 12, 4, 12);
+        controls.add(lThr, gc);
+
+        gc.gridy++;
+        gc.insets = new Insets(0, 12, 12, 12);
+        controls.add(threshold, gc);
+
+        gc.gridy++;
+        gc.insets = new Insets(0, 12, 12, 12);
+        controls.add(buttons, gc);
+
+        gc.gridy++;
+        gc.insets = new Insets(0, 12, 12, 12);
+        controls.add(hint, gc);
 
         JPanel ringCard = new CardPanel();
         ringCard.setLayout(new BorderLayout());
@@ -139,23 +185,23 @@ public class AttendanceUI extends JPanel {
                 int h = p.getHeight();
 
                 int leftW = Math.max(360, (int) (w * 0.40));
-                controls.setBounds(0, 0, leftW, 182);
-                ringCard.setBounds(0, 196, leftW, h - 196);
+                int controlsH = 360;
+                int gap = 14;
+                controls.setBounds(0, 0, leftW, controlsH);
+                ringCard.setBounds(0, controlsH + gap, leftW, h - (controlsH + gap));
 
                 listCard.setBounds(leftW + 16, 0, w - leftW - 16, h);
-
-                int x = 14;
-                roll.setBounds(x, 14, leftW - 28, 34);
-                newDay.setBounds(x, 60, 100, 34);
-                present.setBounds(x + 108, 60, 128, 34);
-                summary.setBounds(x + 244, 60, 112, 34);
-
-                threshold.setBounds(x, 106, leftW - 28, 34);
-                defaulters.setBounds(x, 146, leftW - 28, 34);
             }
         });
 
         return p;
+    }
+
+    private static JLabel label(String text) {
+        JLabel l = new JLabel(text);
+        l.setForeground(Theme.MUTED);
+        l.setFont(l.getFont().deriveFont(Font.BOLD, 12f));
+        return l;
     }
 
     private void markPresent() {

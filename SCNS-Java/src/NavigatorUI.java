@@ -60,7 +60,7 @@ public class NavigatorUI extends JPanel {
         title.setForeground(Theme.TEXT);
         title.setFont(title.getFont().deriveFont(Font.BOLD, 22f));
 
-        JLabel sub = new JLabel("Graph DSAs • BFS (hops) • Dijkstra (weighted shortest path)");
+        JLabel sub = new JLabel("BFS = fewest hops • Dijkstra = minimum distance (weighted) • Visual route + visited order");
         sub.setForeground(Theme.MUTED);
 
         JPanel left = new JPanel();
