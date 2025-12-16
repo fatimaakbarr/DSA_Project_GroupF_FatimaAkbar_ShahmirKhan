@@ -24,6 +24,22 @@ bool AttendanceManager::registerStudent(int roll, const std::string& name) {
   return true;
 }
 
+bool AttendanceManager::removeStudent(int roll) {
+  int idx;
+  std::string key = std::to_string(roll);
+  if (!idxOf_.get(key, idx)) return false;
+
+  // swap-remove to keep vector dense
+  int last = (int)entries_.size() - 1;
+  if (idx != last) {
+    entries_[idx] = entries_[last];
+    idxOf_.put(std::to_string(entries_[idx].roll), idx);
+  }
+  entries_.pop_back();
+  idxOf_.erase(key);
+  return true;
+}
+
 bool AttendanceManager::markPresent(int roll) {
   int idx;
   if (!idxOf_.get(std::to_string(roll), idx)) return false;

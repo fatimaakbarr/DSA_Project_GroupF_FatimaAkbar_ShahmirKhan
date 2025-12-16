@@ -21,6 +21,7 @@ class AttendanceManager {
   void seedDefault();
 
   bool registerStudent(int roll, const std::string& name);
+  bool removeStudent(int roll);
   bool markPresent(int roll);
   bool incrementTotalForAll();
 

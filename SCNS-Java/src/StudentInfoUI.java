@@ -284,41 +284,8 @@ public class StudentInfoUI extends JPanel {
 
     private void highlightTree(int rollToHighlight) {
         String snap = nb.sisTreeSnapshot();
-        List<int[]> edges = parseTriples(snap);
+        List<int[]> edges = JsonMini.arrIntTriples(snap);
         tree.setSnapshot(edges, rollToHighlight);
-    }
-
-    private static List<int[]> parseTriples(String json) {
-        List<int[]> out = new ArrayList<>();
-        if (json == null) return out;
-        String s = json.trim();
-        if (!s.startsWith("[") || !s.endsWith("]")) return out;
-        // expected: [[n,l,r],[n,l,r],...]
-        int i = 0;
-        while (i < s.length()) {
-            int a = s.indexOf('[', i);
-            if (a < 0) break;
-            int b = s.indexOf(']', a + 1);
-            if (b < 0) break;
-            String inner = s.substring(a + 1, b).trim();
-            String[] parts = inner.split(",");
-            if (parts.length >= 3) {
-                int n = safeInt(parts[0]);
-                int l = safeInt(parts[1]);
-                int r = safeInt(parts[2]);
-                out.add(new int[] { n, l, r });
-            }
-            i = b + 1;
-        }
-        return out;
-    }
-
-    private static int safeInt(String s) {
-        try {
-            return Integer.parseInt(s.trim());
-        } catch (Exception e) {
-            return 0;
-        }
     }
 
     private static JTextField field(String placeholder) {

@@ -68,6 +68,39 @@ public final class JsonMini {
         return out;
     }
 
+    // Parses: [[n,l,r],[n,l,r],...] into List<int[]{n,l,r}>
+    public static List<int[]> arrIntTriples(String json) {
+        List<int[]> out = new ArrayList<>();
+        json = json == null ? "" : json.trim();
+        if (!json.startsWith("[") || !json.endsWith("]")) return out;
+
+        int i = 1; // skip outer [
+        while (i < json.length() - 1) {
+            i = skipWs(json, i);
+            if (i >= json.length() - 1) break;
+            char c = json.charAt(i);
+            if (c == ',') { i++; continue; }
+            if (c != '[') { i++; continue; }
+
+            int end = matchBrace(json, i, '[', ']');
+            if (end <= i) break;
+            String inner = json.substring(i + 1, end - 1).trim(); // n,l,r
+            String[] parts = inner.split(",");
+            if (parts.length >= 3) {
+                try {
+                    int n = Integer.parseInt(parts[0].trim());
+                    int l = Integer.parseInt(parts[1].trim());
+                    int r = Integer.parseInt(parts[2].trim());
+                    out.add(new int[] { n, l, r });
+                } catch (Exception ignored) {
+                }
+            }
+            i = end;
+        }
+
+        return out;
+    }
+
     public static int asInt(String raw, int def) {
         try {
             return Integer.parseInt(stripQuotes(raw));

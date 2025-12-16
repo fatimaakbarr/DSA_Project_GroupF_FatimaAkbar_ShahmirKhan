@@ -131,6 +131,9 @@ JNIEXPORT jstring JNICALL Java_NativeBridge_sisGetStudent(JNIEnv* env, jobject, 
 
 JNIEXPORT jstring JNICALL Java_NativeBridge_sisDeleteStudent(JNIEnv* env, jobject, jint roll) {
   bool removed = backend().students.remove((int)roll);
+  if (removed) {
+    backend().attendance.removeStudent((int)roll);
+  }
   using namespace jsonutil;
   std::string out = obj({
       {"ok", removed ? "true" : "false"},
