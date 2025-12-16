@@ -295,6 +295,9 @@ class AnimatedSwitcher extends JPanel {
     private JComponent next;
     private float t = 1f;
     private String currentKey;
+    private java.awt.image.BufferedImage fromImg;
+    private java.awt.image.BufferedImage toImg;
+    private boolean transitioning = false;
 
     AnimatedSwitcher() {
         setOpaque(false);
@@ -326,20 +329,41 @@ class AnimatedSwitcher extends JPanel {
         final JComponent to = next;
         currentKey = key;
 
+        // Snapshot-based transition: avoids flicker/glitches on Windows LAF.
+        int w = Math.max(1, getWidth());
+        int h = Math.max(1, getHeight());
+
         if (to.getParent() != this) add(to);
-        to.setBounds(getWidth(), 0, getWidth(), getHeight());
+        // Ensure both components are laid out at the correct size for the snapshot.
+        if (from != null) {
+            from.setBounds(0, 0, w, h);
+            from.doLayout();
+        }
+        to.setBounds(0, 0, w, h);
+        to.doLayout();
+
+        fromImg = (from == null) ? null : snapshot(from, w, h);
+        toImg = snapshot(to, w, h);
+
+        // Hide real components during transition; we'll paint images.
+        if (from != null) from.setVisible(false);
+        to.setVisible(false);
+
+        transitioning = true;
         t = 0f;
 
         Anim.run(420, 60, tt -> {
             t = (float) Anim.easeInOutCubic(tt);
-            int dx = (int) (getWidth() * t);
-            if (from != null) from.setBounds(-dx, 0, getWidth(), getHeight());
-            to.setBounds(getWidth() - dx, 0, getWidth(), getHeight());
             repaint();
         }, () -> {
+            transitioning = false;
+            fromImg = null;
+            toImg = null;
+
             if (from != null) remove(from);
             current = to;
             next = null;
+            current.setVisible(true);
             current.setBounds(0, 0, getWidth(), getHeight());
             revalidate();
             repaint();
@@ -354,43 +378,47 @@ class AnimatedSwitcher extends JPanel {
 
     @Override
     protected void paintChildren(Graphics g) {
-        // Add fade during transitions (more “sleek” than only sliding)
-        if (next == null || current == null) {
+        if (!transitioning) {
             super.paintChildren(g);
             return;
         }
+
         Graphics2D g2 = (Graphics2D) g.create();
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+
+        int w = getWidth();
+        int h = getHeight();
+        int dx = (int) (w * t);
 
         float aTo = Math.max(0f, Math.min(1f, t));
         float aFrom = 1f - aTo;
 
         java.awt.Composite old = g2.getComposite();
 
-        // Important: translate to each child's bounds before painting,
-        // otherwise Swing paints them at (0,0) and it looks “glitchy”.
-        g2.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, aFrom));
-        paintChildAt(g2, current);
-
-        g2.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, aTo));
-        paintChildAt(g2, next);
+        if (fromImg != null) {
+            g2.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, aFrom));
+            g2.drawImage(fromImg, -dx, 0, w, h, null);
+        }
+        if (toImg != null) {
+            g2.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, aTo));
+            g2.drawImage(toImg, w - dx, 0, w, h, null);
+        }
 
         g2.setComposite(old);
-
         g2.dispose();
     }
 
-    private static void paintChildAt(Graphics2D g2, JComponent c) {
-        if (c == null) return;
-        java.awt.Shape oldClip = g2.getClip();
-        java.awt.geom.AffineTransform oldTx = g2.getTransform();
-
-        g2.translate(c.getX(), c.getY());
-        g2.clipRect(0, 0, c.getWidth(), c.getHeight());
+    private static java.awt.image.BufferedImage snapshot(JComponent c, int w, int h) {
+        java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = img.createGraphics();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         c.paint(g2);
-
-        g2.setTransform(oldTx);
-        g2.setClip(oldClip);
+        g2.dispose();
+        return img;
     }
 }
 

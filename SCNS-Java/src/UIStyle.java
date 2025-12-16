@@ -3,6 +3,7 @@ import java.awt.Component;
 import java.awt.Font;
 
 import javax.swing.BorderFactory;
+import javax.swing.JLabel;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JList;
@@ -10,6 +11,7 @@ import javax.swing.JTable;
 import javax.swing.ListCellRenderer;
 import javax.swing.SwingConstants;
 import javax.swing.UIManager;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.plaf.basic.BasicComboBoxRenderer;
 
 public final class UIStyle {
@@ -78,6 +80,7 @@ public final class UIStyle {
         t.setShowVerticalLines(false);
         t.setSelectionBackground(new Color(Theme.ACCENT.getRed(), Theme.ACCENT.getGreen(), Theme.ACCENT.getBlue(), 90));
         t.setSelectionForeground(Theme.TEXT);
+        t.setFillsViewportHeight(true);
 
         if (t.getTableHeader() != null) {
             t.getTableHeader().setOpaque(true);
@@ -85,6 +88,43 @@ public final class UIStyle {
             t.getTableHeader().setForeground(Theme.TEXT);
             t.getTableHeader().setReorderingAllowed(false);
             t.getTableHeader().setFont(t.getTableHeader().getFont().deriveFont(Font.BOLD));
+        }
+
+        // Force consistent dark rendering (fixes random white row / header artifacts on Windows LAF)
+        DefaultTableCellRenderer cell = new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                JLabel c = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                c.setOpaque(true);
+                c.setForeground(Theme.TEXT);
+
+                Color zebra = (row % 2 == 0) ? Theme.CARD : new Color(Theme.CARD.getRed() + 2, Theme.CARD.getGreen() + 2, Theme.CARD.getBlue() + 6);
+                if (isSelected) {
+                    c.setBackground(new Color(Theme.ACCENT.getRed(), Theme.ACCENT.getGreen(), Theme.ACCENT.getBlue(), 110));
+                } else {
+                    c.setBackground(zebra);
+                }
+                c.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 10));
+                return c;
+            }
+        };
+        t.setDefaultRenderer(Object.class, cell);
+        t.setDefaultRenderer(Number.class, cell);
+
+        if (t.getTableHeader() != null) {
+            DefaultTableCellRenderer hdr = new DefaultTableCellRenderer() {
+                @Override
+                public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                    JLabel c = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                    c.setOpaque(true);
+                    c.setForeground(Theme.TEXT);
+                    c.setBackground(Theme.CARD_2);
+                    c.setFont(c.getFont().deriveFont(Font.BOLD));
+                    c.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
+                    return c;
+                }
+            };
+            t.getTableHeader().setDefaultRenderer(hdr);
         }
     }
 }
