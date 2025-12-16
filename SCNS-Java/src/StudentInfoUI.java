@@ -1,6 +1,10 @@
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
+import java.awt.GridLayout;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -84,10 +88,11 @@ public class StudentInfoUI extends JPanel {
         p.setOpaque(false);
 
         JPanel form = new CardPanel();
-        form.setLayout(null);
+        form.setLayout(new GridBagLayout());
 
-        JLabel hint = new JLabel("Tip: ‘Save’ inserts or updates the AVL record.");
+        JLabel hint = new JLabel("Roll = unique key (AVL). Save inserts/updates. Search loads by roll. Delete removes by roll.");
         hint.setForeground(Theme.MUTED);
+        hint.setFont(hint.getFont().deriveFont(Font.PLAIN, 12f));
 
         ModernButton save = new ModernButton("Save", Theme.ACCENT, Theme.ACCENT_2);
         ModernButton search = new ModernButton("Search", Theme.CARD, Theme.CARD_2);
@@ -99,15 +104,68 @@ public class StudentInfoUI extends JPanel {
         del.addActionListener(e -> delete());
         refresh.addActionListener(e -> refresh());
 
-        form.add(roll);
-        form.add(name);
-        form.add(program);
-        form.add(year);
-        form.add(save);
-        form.add(search);
-        form.add(del);
-        form.add(refresh);
-        form.add(hint);
+        // Field labels (so students understand what each field is for)
+        JLabel lRoll = label("Roll Number");
+        JLabel lName = label("Student Name");
+        JLabel lProg = label("Program");
+        JLabel lYear = label("Year/Semester");
+
+        roll.setToolTipText("Unique student roll number (AVL key). Example: 101");
+        name.setToolTipText("Student full name (stored in AVL record).");
+        program.setToolTipText("Degree/program name. Example: BSCS");
+        year.setToolTipText("Year/Semester number (1-8).");
+
+        // Button grid (always aligned)
+        JPanel buttons = new JPanel(new GridLayout(2, 2, 10, 10));
+        buttons.setOpaque(false);
+        buttons.add(save);
+        buttons.add(search);
+        buttons.add(del);
+        buttons.add(refresh);
+
+        GridBagConstraints gc = new GridBagConstraints();
+        gc.gridx = 0;
+        gc.gridy = 0;
+        gc.weightx = 1;
+        gc.fill = GridBagConstraints.HORIZONTAL;
+        gc.insets = new Insets(10, 12, 4, 12);
+        form.add(lRoll, gc);
+
+        gc.gridy++;
+        gc.insets = new Insets(0, 12, 10, 12);
+        form.add(roll, gc);
+
+        gc.gridy++;
+        gc.insets = new Insets(2, 12, 4, 12);
+        form.add(lName, gc);
+
+        gc.gridy++;
+        gc.insets = new Insets(0, 12, 10, 12);
+        form.add(name, gc);
+
+        gc.gridy++;
+        gc.insets = new Insets(2, 12, 4, 12);
+        form.add(lProg, gc);
+
+        gc.gridy++;
+        gc.insets = new Insets(0, 12, 10, 12);
+        form.add(program, gc);
+
+        gc.gridy++;
+        gc.insets = new Insets(2, 12, 4, 12);
+        form.add(lYear, gc);
+
+        gc.gridy++;
+        gc.insets = new Insets(0, 12, 12, 12);
+        form.add(year, gc);
+
+        gc.gridy++;
+        gc.insets = new Insets(0, 12, 10, 12);
+        form.add(buttons, gc);
+
+        gc.gridy++;
+        gc.insets = new Insets(0, 12, 12, 12);
+        form.add(hint, gc);
 
         JScrollPane sp = new JScrollPane(table);
         sp.setBorder(BorderFactory.createEmptyBorder());
@@ -144,48 +202,23 @@ public class StudentInfoUI extends JPanel {
                 int h = p.getHeight();
 
                 int leftW = Math.max(340, (int) (w * 0.40));
-                int formH = 246;
+                int formH = 360;
                 int gap = 14;
                 form.setBounds(0, 0, leftW, formH);
                 listCard.setBounds(0, formH + gap, leftW, h - (formH + gap));
 
                 treeCard.setBounds(leftW + 16, 0, w - leftW - 16, h);
-
-                int x = 14;
-                int y = 14;
-                int fw = leftW - 28;
-                roll.setBounds(x, y, fw, 34);
-                y += 42;
-                name.setBounds(x, y, fw, 34);
-                y += 42;
-                program.setBounds(x, y, fw, 34);
-                y += 42;
-                year.setBounds(x, y, fw, 34);
-
-                // Responsive button layout (prevents clipping on smaller widths)
-                int btnY = formH - 86;
-                int btnH = 34;
-                int spacing = 8;
-
-                int[] bw = new int[] { 84, 92, 88, 96 };
-                ModernButton[] bs = new ModernButton[] { save, search, del, refresh };
-                int cx = x;
-                int row = 0;
-                for (int i = 0; i < bs.length; i++) {
-                    int wbtn = bw[i];
-                    if (cx + wbtn > x + fw) { // wrap
-                        row++;
-                        cx = x;
-                    }
-                    bs[i].setBounds(cx, btnY + row * (btnH + spacing), wbtn, btnH);
-                    cx += wbtn + spacing;
-                }
-
-                hint.setBounds(x, formH - 24, fw, 18);
             }
         });
 
         return p;
+    }
+
+    private static JLabel label(String text) {
+        JLabel l = new JLabel(text);
+        l.setForeground(Theme.MUTED);
+        l.setFont(l.getFont().deriveFont(Font.BOLD, 12f));
+        return l;
     }
 
     private void save() {

@@ -366,13 +366,31 @@ class AnimatedSwitcher extends JPanel {
         float aFrom = 1f - aTo;
 
         java.awt.Composite old = g2.getComposite();
+
+        // Important: translate to each child's bounds before painting,
+        // otherwise Swing paints them at (0,0) and it looks “glitchy”.
         g2.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, aFrom));
-        current.paint(g2);
+        paintChildAt(g2, current);
+
         g2.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, aTo));
-        next.paint(g2);
+        paintChildAt(g2, next);
+
         g2.setComposite(old);
 
         g2.dispose();
+    }
+
+    private static void paintChildAt(Graphics2D g2, JComponent c) {
+        if (c == null) return;
+        java.awt.Shape oldClip = g2.getClip();
+        java.awt.geom.AffineTransform oldTx = g2.getTransform();
+
+        g2.translate(c.getX(), c.getY());
+        g2.clipRect(0, 0, c.getWidth(), c.getHeight());
+        c.paint(g2);
+
+        g2.setTransform(oldTx);
+        g2.setClip(oldClip);
     }
 }
 
