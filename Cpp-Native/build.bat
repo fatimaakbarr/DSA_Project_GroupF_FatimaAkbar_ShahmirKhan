@@ -24,8 +24,10 @@ if %errorlevel% neq 0 (
 )
 
 REM Compile the native library
-echo Compiling native_impl.cpp...
-g++ -shared -o campus_backend.dll -I"%JAVA_HOME%\include" -I"%JAVA_HOME%\include\win32" native_impl.cpp
+echo Compiling JNI backend (multiple C++ files)...
+g++ -std=c++17 -O2 -shared -o campus_backend.dll ^
+  -I"%JAVA_HOME%\include" -I"%JAVA_HOME%\include\win32" ^
+  native_impl.cpp graph.cpp avl_tree.cpp heap_attendance.cpp utils_json.cpp
 
 REM Check if compilation succeeded
 if %errorlevel% neq 0 (
