@@ -23,6 +23,8 @@ public class ModernButton extends JButton {
     private int rippleX = 0;
     private int rippleY = 0;
 
+    private float selectedT = 0f;
+
     public ModernButton(String text, Color fill, Color fillHover) {
         super(text);
         this.fill = fill;
@@ -71,6 +73,16 @@ public class ModernButton extends JButton {
         });
     }
 
+    /** For sidebar/navigation use: visually mark a button as selected. */
+    public void setSelectedVisual(boolean selected) {
+        float start = selectedT;
+        float target = selected ? 1f : 0f;
+        Anim.run(240, 60, t -> {
+            selectedT = (float) (start + (target - start) * Anim.easeInOutCubic(t));
+            repaint();
+        }, null);
+    }
+
     private void animateTo(float target) {
         float start = anim;
         Anim.run(180, 60, t -> {
@@ -92,6 +104,11 @@ public class ModernButton extends JButton {
         float alpha = pressed ? 0.92f : (0.90f + 0.10f * anim);
 
         Color base = hover ? blend(fill, fillHover, anim) : fill;
+        // Selected tint (used for sidebar items)
+        if (selectedT > 0f) {
+            base = blend(base, Theme.ACCENT, 0.55f * selectedT);
+            alpha = Math.min(1f, alpha + 0.10f * selectedT);
+        }
 
         g2.translate(0, -lift);
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
@@ -102,6 +119,11 @@ public class ModernButton extends JButton {
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.10f));
         g2.setColor(Color.WHITE);
         g2.fillRoundRect(2, 2, w - 4, Math.max(6, h / 3), 16, 16);
+
+        // border to add definition
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.28f + 0.22f * selectedT));
+        g2.setColor(selectedT > 0f ? new Color(Theme.ACCENT_2.getRed(), Theme.ACCENT_2.getGreen(), Theme.ACCENT_2.getBlue(), 140) : Theme.BORDER);
+        g2.drawRoundRect(0, 0, w - 1, h - 1, 18, 18);
 
         // ripple (more “alive”)
         if (rippleT > 0f && rippleT < 1f) {

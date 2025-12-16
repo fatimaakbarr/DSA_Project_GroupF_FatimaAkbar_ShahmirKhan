@@ -9,17 +9,26 @@ import javax.swing.JList;
 import javax.swing.JTable;
 import javax.swing.ListCellRenderer;
 import javax.swing.SwingConstants;
+import javax.swing.UIManager;
 import javax.swing.plaf.basic.BasicComboBoxRenderer;
 
 public final class UIStyle {
     private UIStyle() {}
 
     public static void comboBox(JComboBox<String> cb) {
+        // Custom glass UI (including the popup) – especially important on Windows.
+        try {
+            cb.setUI(new GlassComboBoxUI());
+        } catch (Throwable ignored) {
+        }
+
         cb.setForeground(Theme.TEXT);
         cb.setBackground(Theme.CARD_2);
         cb.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(Theme.BORDER, 1, true),
                 BorderFactory.createEmptyBorder(2, 8, 2, 8)));
+        cb.setMaximumRowCount(10);
+        cb.setOpaque(false);
 
         cb.setRenderer(new BasicComboBoxRenderer() {
             @Override
@@ -52,6 +61,13 @@ public final class UIStyle {
                 return c;
             }
         });
+
+        // Help some Windows LAFs avoid white popup backgrounds
+        try {
+            UIManager.put("ComboBox.selectionBackground", new Color(Theme.ACCENT.getRed(), Theme.ACCENT.getGreen(), Theme.ACCENT.getBlue(), 140));
+            UIManager.put("ComboBox.selectionForeground", Theme.TEXT);
+        } catch (Throwable ignored) {
+        }
     }
 
     public static void table(JTable t) {

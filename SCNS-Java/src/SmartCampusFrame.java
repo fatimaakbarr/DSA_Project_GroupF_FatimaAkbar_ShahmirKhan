@@ -142,26 +142,10 @@ public class SmartCampusFrame extends JFrame {
         side.add(brand);
         side.add(Box.createVerticalStrut(18));
 
-        ModernButton bHome = new ModernButton("Home", Theme.CARD, Theme.CARD_2);
-        ModernButton bNav = new ModernButton("Campus Navigator", Theme.CARD, Theme.CARD_2);
-        ModernButton bSIS = new ModernButton("Student Info", Theme.CARD, Theme.CARD_2);
-        ModernButton bAtt = new ModernButton("Attendance", Theme.CARD, Theme.CARD_2);
-
-        Dimension btn = new Dimension(220, 44);
-        for (ModernButton b : new ModernButton[] { bHome, bNav, bSIS, bAtt }) {
-            b.setHorizontalAlignment(SwingConstants.LEFT);
-            b.setMaximumSize(btn);
-            b.setPreferredSize(btn);
-            b.setMinimumSize(btn);
-            b.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 14, 0, 14));
-            side.add(b);
-            side.add(Box.createVerticalStrut(10));
-        }
-
-        bHome.addActionListener(e -> switcher.switchTo("home"));
-        bNav.addActionListener(e -> switcher.switchTo("nav"));
-        bSIS.addActionListener(e -> switcher.switchTo("sis"));
-        bAtt.addActionListener(e -> switcher.switchTo("att"));
+        SidebarNav nav = new SidebarNav();
+        nav.setMaximumSize(new Dimension(1000, 260));
+        nav.setPreferredSize(new Dimension(220, 220));
+        side.add(nav);
 
         side.add(Box.createVerticalGlue());
 
@@ -170,6 +154,89 @@ public class SmartCampusFrame extends JFrame {
         side.add(foot);
 
         return side;
+    }
+
+    /** Sidebar navigation with animated active indicator. */
+    private final class SidebarNav extends JPanel {
+        private final ModernButton bHome = new ModernButton("Home", Theme.CARD, Theme.CARD_2);
+        private final ModernButton bNav = new ModernButton("Campus Navigator", Theme.CARD, Theme.CARD_2);
+        private final ModernButton bSIS = new ModernButton("Student Info", Theme.CARD, Theme.CARD_2);
+        private final ModernButton bAtt = new ModernButton("Attendance", Theme.CARD, Theme.CARD_2);
+
+        private ModernButton selected = bHome;
+        private float indY = 0f;
+        private float indTargetY = 0f;
+
+        SidebarNav() {
+            setOpaque(false);
+            setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+
+            Dimension btn = new Dimension(220, 44);
+            for (ModernButton b : new ModernButton[] { bHome, bNav, bSIS, bAtt }) {
+                b.setHorizontalAlignment(SwingConstants.LEFT);
+                b.setMaximumSize(btn);
+                b.setPreferredSize(btn);
+                b.setMinimumSize(btn);
+                b.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 14, 0, 14));
+                add(b);
+                add(Box.createVerticalStrut(10));
+            }
+
+            select(bHome, false);
+
+            bHome.addActionListener(e -> { select(bHome, true); switcher.switchTo("home"); });
+            bNav.addActionListener(e -> { select(bNav, true); switcher.switchTo("nav"); });
+            bSIS.addActionListener(e -> { select(bSIS, true); switcher.switchTo("sis"); });
+            bAtt.addActionListener(e -> { select(bAtt, true); switcher.switchTo("att"); });
+        }
+
+        private void select(ModernButton b, boolean animate) {
+            if (selected != null) selected.setSelectedVisual(false);
+            selected = b;
+            if (selected != null) selected.setSelectedVisual(true);
+
+            // update target indicator position (relative to this panel)
+            indTargetY = selected.getY() + selected.getHeight() / 2f;
+            if (!animate) indY = indTargetY;
+
+            float start = indY;
+            float target = indTargetY;
+            if (animate) {
+                Anim.run(260, 60, t -> {
+                    indY = (float) (start + (target - start) * Anim.easeInOutCubic(t));
+                    repaint();
+                }, null);
+            } else {
+                repaint();
+            }
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            if (selected == null) return;
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            // Ensure we have correct coordinates after first layout
+            indTargetY = selected.getY() + selected.getHeight() / 2f;
+            if (Math.abs(indY) < 0.001f) indY = indTargetY;
+
+            int x = 2;
+            int w = getWidth() - 4;
+            int h = 44;
+            int y = (int) (indY - h / 2f);
+
+            // glow behind selected
+            g2.setColor(new Color(Theme.ACCENT.getRed(), Theme.ACCENT.getGreen(), Theme.ACCENT.getBlue(), 18));
+            g2.fillRoundRect(x, y - 6, w, h + 12, 18, 18);
+
+            // left active bar
+            g2.setColor(Theme.ACCENT_2);
+            g2.fillRoundRect(6, y + 8, 6, h - 16, 10, 10);
+
+            g2.dispose();
+        }
     }
 
     private static final class BrandHeader extends JComponent {
