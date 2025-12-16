@@ -39,6 +39,8 @@ public class StudentInfoUI extends JPanel {
         setOpaque(false);
         setLayout(null);
 
+        UIStyle.table(table);
+
         JComponent header = header();
         JComponent body = body();
         add(header);
@@ -110,6 +112,8 @@ public class StudentInfoUI extends JPanel {
         JScrollPane sp = new JScrollPane(table);
         sp.setBorder(BorderFactory.createEmptyBorder());
         sp.getViewport().setBackground(Theme.CARD);
+        table.setBackground(Theme.CARD);
+        table.setForeground(Theme.TEXT);
 
         JPanel listCard = new CardPanel();
         listCard.setLayout(new BorderLayout());
@@ -140,8 +144,10 @@ public class StudentInfoUI extends JPanel {
                 int h = p.getHeight();
 
                 int leftW = Math.max(340, (int) (w * 0.40));
-                form.setBounds(0, 0, leftW, 210);
-                listCard.setBounds(0, 224, leftW, h - 224);
+                int formH = 246;
+                int gap = 14;
+                form.setBounds(0, 0, leftW, formH);
+                listCard.setBounds(0, formH + gap, leftW, h - (formH + gap));
 
                 treeCard.setBounds(leftW + 16, 0, w - leftW - 16, h);
 
@@ -156,13 +162,26 @@ public class StudentInfoUI extends JPanel {
                 y += 42;
                 year.setBounds(x, y, fw, 34);
 
-                int by = 14;
-                save.setBounds(x, by + 170, 80, 34);
-                search.setBounds(x + 88, by + 170, 88, 34);
-                del.setBounds(x + 184, by + 170, 84, 34);
-                refresh.setBounds(x + 276, by + 170, 90, 34);
+                // Responsive button layout (prevents clipping on smaller widths)
+                int btnY = formH - 86;
+                int btnH = 34;
+                int spacing = 8;
 
-                hint.setBounds(x, by + 208, fw, 18);
+                int[] bw = new int[] { 84, 92, 88, 96 };
+                ModernButton[] bs = new ModernButton[] { save, search, del, refresh };
+                int cx = x;
+                int row = 0;
+                for (int i = 0; i < bs.length; i++) {
+                    int wbtn = bw[i];
+                    if (cx + wbtn > x + fw) { // wrap
+                        row++;
+                        cx = x;
+                    }
+                    bs[i].setBounds(cx, btnY + row * (btnH + spacing), wbtn, btnH);
+                    cx += wbtn + spacing;
+                }
+
+                hint.setBounds(x, formH - 24, fw, 18);
             }
         });
 

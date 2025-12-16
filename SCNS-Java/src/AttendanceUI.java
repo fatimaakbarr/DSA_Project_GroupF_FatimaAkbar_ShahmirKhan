@@ -36,6 +36,8 @@ public class AttendanceUI extends JPanel {
         setOpaque(false);
         setLayout(null);
 
+        UIStyle.table(table);
+
         JComponent header = header();
         JComponent body = body();
         add(header);
@@ -114,6 +116,8 @@ public class AttendanceUI extends JPanel {
         JScrollPane sp = new JScrollPane(table);
         sp.setBorder(BorderFactory.createEmptyBorder());
         sp.getViewport().setBackground(Theme.CARD);
+        table.setBackground(Theme.CARD);
+        table.setForeground(Theme.TEXT);
 
         JPanel listCard = new CardPanel();
         listCard.setLayout(new BorderLayout());

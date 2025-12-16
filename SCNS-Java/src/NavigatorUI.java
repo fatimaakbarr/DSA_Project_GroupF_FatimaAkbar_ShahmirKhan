@@ -8,7 +8,6 @@ import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JLayeredPane;
 import javax.swing.JPanel;
-import javax.swing.SwingConstants;
 
 public class NavigatorUI extends JPanel {
     private final NativeBridge nb;
@@ -31,6 +30,8 @@ public class NavigatorUI extends JPanel {
         String[] nodes = safe(nb.navLocations());
         src = new JComboBox<>(nodes);
         dst = new JComboBox<>(nodes);
+        UIStyle.comboBox(src);
+        UIStyle.comboBox(dst);
 
         graph.setNodes(nodes);
 
@@ -84,20 +85,19 @@ public class NavigatorUI extends JPanel {
         JLabel l2 = new JLabel("To");
         l2.setForeground(Theme.MUTED);
 
-        src.setOpaque(false);
-        dst.setOpaque(false);
-
-        ModernButton bBfs = new ModernButton("BFS", Theme.CARD, Theme.ACCENT_2);
-        ModernButton bDij = new ModernButton("Dijkstra", Theme.ACCENT, Theme.ACCENT_2);
+        PillToggle bBfs = new PillToggle("BFS");
+        PillToggle bDij = new PillToggle("Dijkstra");
         setAlgoButtons(bBfs, bDij);
 
         bBfs.addActionListener(e -> {
             algorithm = "BFS";
             setAlgoButtons(bBfs, bDij);
+            out.setText("Algorithm: BFS (hops)   •   Pick two locations and click Compute Route.");
         });
         bDij.addActionListener(e -> {
             algorithm = "Dijkstra";
             setAlgoButtons(bBfs, bDij);
+            out.setText("Algorithm: Dijkstra (weighted)   •   Pick two locations and click Compute Route.");
         });
 
         ModernButton run = new ModernButton("Compute Route", Theme.ACCENT, Theme.ACCENT_2);
@@ -147,14 +147,9 @@ public class NavigatorUI extends JPanel {
         return p;
     }
 
-    private void setAlgoButtons(ModernButton bfs, ModernButton dij) {
-        if ("BFS".equals(algorithm)) {
-            bfs.setForeground(Theme.TEXT);
-            dij.setForeground(Theme.TEXT);
-        } else {
-            bfs.setForeground(Theme.TEXT);
-            dij.setForeground(Theme.TEXT);
-        }
+    private void setAlgoButtons(PillToggle bfs, PillToggle dij) {
+        bfs.setActive("BFS".equals(algorithm));
+        dij.setActive(!"BFS".equals(algorithm));
     }
 
     private void compute() {
