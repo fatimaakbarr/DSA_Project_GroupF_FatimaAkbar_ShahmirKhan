@@ -5,6 +5,7 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.geom.Ellipse2D;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
@@ -17,6 +18,10 @@ public class ModernButton extends JButton {
 
     private final Color fill;
     private final Color fillHover;
+
+    private float rippleT = 0f;
+    private int rippleX = 0;
+    private int rippleY = 0;
 
     public ModernButton(String text, Color fill, Color fillHover) {
         super(text);
@@ -48,6 +53,13 @@ public class ModernButton extends JButton {
             @Override
             public void mousePressed(MouseEvent e) {
                 pressed = true;
+                rippleX = e.getX();
+                rippleY = e.getY();
+                rippleT = 0f;
+                Anim.run(420, 60, t -> {
+                    rippleT = (float) Anim.easeOutCubic(t);
+                    repaint();
+                }, null);
                 repaint();
             }
 
@@ -90,6 +102,17 @@ public class ModernButton extends JButton {
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.10f));
         g2.setColor(Color.WHITE);
         g2.fillRoundRect(2, 2, w - 4, Math.max(6, h / 3), 16, 16);
+
+        // ripple (more “alive”)
+        if (rippleT > 0f && rippleT < 1f) {
+            float rt = rippleT;
+            float maxR = (float) Math.hypot(w, h);
+            float r = 10f + maxR * rt;
+            float a = 0.18f * (1f - rt);
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, a));
+            g2.setColor(Color.WHITE);
+            g2.fill(new Ellipse2D.Double(rippleX - r, rippleY - r, r * 2, r * 2));
+        }
 
         g2.dispose();
         super.paintComponent(g);

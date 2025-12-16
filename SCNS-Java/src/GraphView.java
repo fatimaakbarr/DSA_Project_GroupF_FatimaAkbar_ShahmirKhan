@@ -19,9 +19,16 @@ public class GraphView extends JComponent {
     private final List<String> visited = new ArrayList<>();
 
     private float progress = 0f;
+    private float pulse = 0f;
+    private final javax.swing.Timer idle;
 
     public GraphView() {
         setOpaque(false);
+        idle = new javax.swing.Timer(16, e -> {
+            pulse += 0.035f;
+            repaint();
+        });
+        idle.start();
     }
 
     public void setNodes(String[] nodes) {
@@ -68,8 +75,10 @@ public class GraphView extends JComponent {
             String v = visited.get(i);
             double[] p = pos.get(v);
             if (p == null) continue;
-            g2.setColor(new Color(Theme.ACCENT_2.getRed(), Theme.ACCENT_2.getGreen(), Theme.ACCENT_2.getBlue(), 35));
-            g2.fill(new Ellipse2D.Double(p[0] - 20, p[1] - 20, 40, 40));
+            int a = 28 + (int) (18 * (0.5 + 0.5 * Math.sin(pulse + i)));
+            g2.setColor(new Color(Theme.ACCENT_2.getRed(), Theme.ACCENT_2.getGreen(), Theme.ACCENT_2.getBlue(), a));
+            double rr = 18 + 6 * (0.5 + 0.5 * Math.sin(pulse * 0.9 + i));
+            g2.fill(new Ellipse2D.Double(p[0] - rr, p[1] - rr, rr * 2, rr * 2));
         }
 
         // Path lines

@@ -10,6 +10,8 @@ public final class Theme {
     public static final Color BG_1 = new Color(18, 22, 36);
     public static final Color CARD = new Color(22, 28, 46);
     public static final Color CARD_2 = new Color(26, 34, 56);
+    public static final Color GLASS = new Color(0, 0, 0, 88);
+    public static final Color BORDER = new Color(255, 255, 255, 28);
     public static final Color TEXT = new Color(235, 242, 255);
     public static final Color MUTED = new Color(160, 174, 200);
     public static final Color ACCENT = new Color(120, 92, 255);
@@ -41,5 +43,12 @@ public final class Theme {
 
         UIManager.put("Panel.background", BG_0);
         UIManager.put("Label.foreground", TEXT);
+
+        UIManager.put("Table.background", CARD);
+        UIManager.put("Table.foreground", TEXT);
+        UIManager.put("Table.gridColor", new Color(255, 255, 255, 18));
+        UIManager.put("Table.selectionBackground", new Color(Theme.ACCENT.getRed(), Theme.ACCENT.getGreen(), Theme.ACCENT.getBlue(), 80));
+        UIManager.put("TableHeader.background", CARD_2);
+        UIManager.put("TableHeader.foreground", TEXT);
     }
 }

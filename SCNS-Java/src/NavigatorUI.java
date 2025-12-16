@@ -203,8 +203,10 @@ public class NavigatorUI extends JPanel {
         protected void paintComponent(java.awt.Graphics g) {
             java.awt.Graphics2D g2 = (java.awt.Graphics2D) g.create();
             g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(new java.awt.Color(0, 0, 0, 80));
+            g2.setColor(Theme.GLASS);
             g2.fillRoundRect(0, 0, getWidth(), getHeight(), 22, 22);
+            g2.setColor(Theme.BORDER);
+            g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 22, 22);
             g2.dispose();
             super.paintComponent(g);
         }

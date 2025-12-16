@@ -17,9 +17,15 @@ public class TreeView extends JComponent {
     private List<int[]> edges = java.util.Collections.emptyList();
     private int highlightRoll = -1;
     private float alpha = 0f;
+    private float pulse = 0f;
+    private final javax.swing.Timer idle = new javax.swing.Timer(16, e -> {
+        pulse += 0.03f;
+        repaint();
+    });
 
     public TreeView() {
         setOpaque(false);
+        idle.start();
     }
 
     public void setSnapshot(List<int[]> edges, int highlightRoll) {
@@ -88,6 +94,11 @@ public class TreeView extends JComponent {
             if (p == null) continue;
 
             boolean hl = (roll == highlightRoll);
+            int glowA = hl ? (50 + (int) (55 * (0.5 + 0.5 * Math.sin(pulse * 1.3)))) : 0;
+            if (glowA > 0) {
+                g2.setColor(new Color(Theme.ACCENT_2.getRed(), Theme.ACCENT_2.getGreen(), Theme.ACCENT_2.getBlue(), glowA));
+                g2.fill(new Ellipse2D.Double(p[0] - 22, p[1] - 22, 44, 44));
+            }
             Color ring = hl ? Theme.ACCENT_2 : Theme.ACCENT;
 
             g2.setColor(new Color(12, 14, 24));

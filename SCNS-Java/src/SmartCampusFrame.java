@@ -6,6 +6,8 @@ import java.awt.GradientPaint;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.geom.Ellipse2D;
+import java.util.Random;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -14,6 +16,7 @@ import javax.swing.JFrame;
 import javax.swing.JLayeredPane;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
+import javax.swing.Timer;
 
 public class SmartCampusFrame extends JFrame {
     private final NativeBridge nb;
@@ -51,9 +54,28 @@ public class SmartCampusFrame extends JFrame {
     }
 
     private final class RootView extends JPanel {
+        private final Random rng = new Random(7);
+        private final float[] px = new float[34];
+        private final float[] py = new float[34];
+        private final float[] pv = new float[34];
+        private float bgPhase = 0f;
+        private final Timer bgTimer;
+
         RootView() {
             setLayout(new BorderLayout());
             setOpaque(false);
+
+            // live background animation so the UI always feels “alive”
+            for (int i = 0; i < px.length; i++) {
+                px[i] = rng.nextFloat();
+                py[i] = rng.nextFloat();
+                pv[i] = 0.3f + rng.nextFloat() * 0.9f;
+            }
+            bgTimer = new Timer(16, e -> {
+                bgPhase += 0.012f;
+                repaint();
+            });
+            bgTimer.start();
 
             JPanel sidebar = buildSidebar();
             sidebar.setPreferredSize(new Dimension(260, 10));
@@ -86,11 +108,24 @@ public class SmartCampusFrame extends JFrame {
             g2.setPaint(gp);
             g2.fillRect(0, 0, w, h);
 
-            // subtle glow
-            g2.setColor(new Color(Theme.ACCENT.getRed(), Theme.ACCENT.getGreen(), Theme.ACCENT.getBlue(), 18));
-            g2.fillOval(-200, -120, 520, 520);
-            g2.setColor(new Color(Theme.ACCENT_2.getRed(), Theme.ACCENT_2.getGreen(), Theme.ACCENT_2.getBlue(), 14));
-            g2.fillOval(w - 420, h - 420, 700, 700);
+            // animated glow blobs
+            int a1 = 18 + (int) (8 * Math.sin(bgPhase));
+            int a2 = 14 + (int) (10 * Math.cos(bgPhase * 0.8));
+            g2.setColor(new Color(Theme.ACCENT.getRed(), Theme.ACCENT.getGreen(), Theme.ACCENT.getBlue(), a1));
+            g2.fillOval((int) (-220 + 40 * Math.sin(bgPhase * 0.9)), (int) (-140 + 30 * Math.cos(bgPhase)), 560, 560);
+            g2.setColor(new Color(Theme.ACCENT_2.getRed(), Theme.ACCENT_2.getGreen(), Theme.ACCENT_2.getBlue(), a2));
+            g2.fillOval((int) (w - 520 + 55 * Math.cos(bgPhase * 0.7)), (int) (h - 520 + 45 * Math.sin(bgPhase * 0.8)), 820, 820);
+
+            // floating particles
+            g2.setColor(new Color(255, 255, 255, 18));
+            for (int i = 0; i < px.length; i++) {
+                float x = (px[i] + bgPhase * 0.02f * pv[i]) % 1f;
+                float y = (py[i] + bgPhase * 0.015f * pv[i]) % 1f;
+                double sx = x * w;
+                double sy = y * h;
+                double r = 1.5 + 2.2 * (0.5 + 0.5 * Math.sin(bgPhase * 1.6 + i));
+                g2.fill(new Ellipse2D.Double(sx, sy, r, r));
+            }
 
             g2.dispose();
         }
@@ -228,8 +263,8 @@ class AnimatedSwitcher extends JPanel {
         to.setBounds(getWidth(), 0, getWidth(), getHeight());
         t = 0f;
 
-        Anim.run(360, 60, tt -> {
-            t = (float) Anim.easeOutCubic(tt);
+        Anim.run(420, 60, tt -> {
+            t = (float) Anim.easeInOutCubic(tt);
             int dx = (int) (getWidth() * t);
             if (from != null) from.setBounds(-dx, 0, getWidth(), getHeight());
             to.setBounds(getWidth() - dx, 0, getWidth(), getHeight());
@@ -248,6 +283,29 @@ class AnimatedSwitcher extends JPanel {
     public void doLayout() {
         if (current != null) current.setBounds(0, 0, getWidth(), getHeight());
         if (next != null) next.setBounds(getWidth(), 0, getWidth(), getHeight());
+    }
+
+    @Override
+    protected void paintChildren(Graphics g) {
+        // Add fade during transitions (more “sleek” than only sliding)
+        if (next == null || current == null) {
+            super.paintChildren(g);
+            return;
+        }
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        float aTo = Math.max(0f, Math.min(1f, t));
+        float aFrom = 1f - aTo;
+
+        java.awt.Composite old = g2.getComposite();
+        g2.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, aFrom));
+        current.paint(g2);
+        g2.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, aTo));
+        next.paint(g2);
+        g2.setComposite(old);
+
+        g2.dispose();
     }
 }
 
