@@ -15,7 +15,8 @@ import javax.swing.JComponent;
 
 public class GraphView extends JComponent {
     private String[] nodes = new String[0];
-    private final List<String> path = new ArrayList<>();
+    private final List<String> path = new ArrayList<>(); // primary
+    private final List<String> path2 = new ArrayList<>(); // secondary (compare mode)
     private final List<String> visited = new ArrayList<>();
 
     private float progress = 0f;
@@ -39,10 +40,25 @@ public class GraphView extends JComponent {
     public void animateResult(List<String> path, List<String> visited) {
         this.path.clear();
         if (path != null) this.path.addAll(path);
+        this.path2.clear();
         this.visited.clear();
         if (visited != null) this.visited.addAll(visited);
         progress = 0f;
         Anim.run(700, 60, t -> {
+            progress = (float) Anim.easeOutCubic(t);
+            repaint();
+        }, null);
+    }
+
+    public void animateCompare(List<String> primaryPath, List<String> secondaryPath, List<String> visited) {
+        this.path.clear();
+        if (primaryPath != null) this.path.addAll(primaryPath);
+        this.path2.clear();
+        if (secondaryPath != null) this.path2.addAll(secondaryPath);
+        this.visited.clear();
+        if (visited != null) this.visited.addAll(visited);
+        progress = 0f;
+        Anim.run(780, 60, t -> {
             progress = (float) Anim.easeOutCubic(t);
             repaint();
         }, null);
@@ -93,15 +109,30 @@ public class GraphView extends JComponent {
             g2.draw(new Line2D.Double(a[0], a[1], b[0], b[1]));
         }
 
+        // Secondary path (compare mode) - dashed cyan
+        int path2Edges = Math.max(0, path2.size() - 1);
+        int draw2 = (int) Math.floor(path2Edges * progress);
+        if (draw2 > 0) {
+            g2.setStroke(new BasicStroke(2.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10f, new float[] { 7f, 7f }, 0f));
+            for (int i = 0; i < draw2; i++) {
+                double[] a = pos.get(path2.get(i));
+                double[] b = pos.get(path2.get(i + 1));
+                if (a == null || b == null) continue;
+                g2.setColor(new Color(Theme.ACCENT_2.getRed(), Theme.ACCENT_2.getGreen(), Theme.ACCENT_2.getBlue(), 200));
+                g2.draw(new Line2D.Double(a[0], a[1], b[0], b[1]));
+            }
+        }
+
         // nodes
         Font f = getFont().deriveFont(Font.BOLD, 12f);
         g2.setFont(f);
         for (String n : nodes) {
             double[] p = pos.get(n);
             boolean inPath = path.contains(n);
+            boolean inPath2 = path2.contains(n);
             boolean isVisited = visited.contains(n);
 
-            Color ring = inPath ? Theme.ACCENT : (isVisited ? Theme.ACCENT_2 : new Color(90, 105, 140));
+            Color ring = inPath ? Theme.ACCENT : (inPath2 ? Theme.ACCENT_2 : (isVisited ? Theme.ACCENT_2 : new Color(90, 105, 140)));
             Color fill = new Color(12, 14, 24);
 
             g2.setColor(fill);

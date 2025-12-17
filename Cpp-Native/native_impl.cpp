@@ -37,6 +37,8 @@ JNIEXPORT jstring JNICALL Java_NativeBridge_getShortestPath(JNIEnv* env, jobject
       {"ok", pr.distance >= 0 ? "true" : "false"},
       {"algorithm", quote(pr.algorithm)},
       {"distance", std::to_string(pr.distance)},
+      {"hops", std::to_string(pr.hops)},
+      {"cost", std::to_string(pr.cost)},
       {"path", arr(pathQuoted)},
       {"visited", arr(visQuoted)},
   });
@@ -85,6 +87,8 @@ JNIEXPORT jstring JNICALL Java_NativeBridge_navShortestPath(JNIEnv* env, jobject
       {"ok", "true"},
       {"algorithm", quote(pr.algorithm)},
       {"distance", std::to_string(pr.distance)},
+      {"hops", std::to_string(pr.hops)},
+      {"cost", std::to_string(pr.cost)},
       {"path", arr(pathQuoted)},
       {"visited", arr(visQuoted)},
   });

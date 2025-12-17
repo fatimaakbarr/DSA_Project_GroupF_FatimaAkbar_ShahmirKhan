@@ -8,7 +8,11 @@
 
 struct PathResult {
   std::vector<std::string> path;
+  // For compatibility: previously used as BFS hops / Dijkstra cost.
   int distance = -1;
+  // Explicit metrics for comparing algorithms.
+  int hops = -1; // number of edges in path
+  int cost = -1; // sum of weights along path
   std::string algorithm;
   std::vector<std::string> visitedOrder; // for BFS visualization
 };
@@ -35,4 +39,5 @@ class CampusGraph {
   std::vector<dsa::LinkedList<Edge>> adj_;
 
   bool resolve(const std::string& name, int& idx) const;
+  int edgeWeight(int fromIdx, int toIdx) const;
 };

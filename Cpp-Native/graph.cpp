@@ -11,6 +11,16 @@ bool CampusGraph::resolve(const std::string& name, int& idx) const {
   return indexOf_.get(name, idx);
 }
 
+int CampusGraph::edgeWeight(int fromIdx, int toIdx) const {
+  if (fromIdx < 0 || toIdx < 0) return -1;
+  if (fromIdx >= (int)adj_.size() || toIdx >= (int)adj_.size()) return -1;
+  for (auto it = adj_[fromIdx].begin(); it != adj_[fromIdx].end(); ++it) {
+    const Edge& e = *it;
+    if (e.to == toIdx) return e.w;
+  }
+  return -1;
+}
+
 bool CampusGraph::addLocation(const std::string& name) {
   int existing;
   if (indexOf_.get(name, existing)) return false;
@@ -96,7 +106,19 @@ PathResult CampusGraph::bfsShortestPath(const std::string& src, const std::strin
   std::reverse(path.begin(), path.end());
 
   res.path = std::move(path);
-  res.distance = dist[t];
+  res.hops = dist[t];
+  res.distance = res.hops; // compatibility
+
+  // Compute weighted cost for the found BFS path (may be larger than Dijkstra).
+  int cost = 0;
+  for (int i = 0; i + 1 < (int)res.path.size(); i++) {
+    int aIdx, bIdx;
+    if (!resolve(res.path[(size_t)i], aIdx) || !resolve(res.path[(size_t)i + 1], bIdx)) { cost = -1; break; }
+    int w = edgeWeight(aIdx, bIdx);
+    if (w < 0) { cost = -1; break; }
+    cost += w;
+  }
+  res.cost = cost;
   return res;
 }
 
@@ -146,6 +168,8 @@ PathResult CampusGraph::dijkstraShortestPath(const std::string& src, const std::
   std::reverse(path.begin(), path.end());
 
   res.path = std::move(path);
-  res.distance = dist[t];
+  res.cost = dist[t];
+  res.distance = res.cost; // compatibility
+  res.hops = (int)res.path.size() > 0 ? (int)res.path.size() - 1 : -1;
   return res;
 }

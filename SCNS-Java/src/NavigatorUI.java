@@ -18,6 +18,7 @@ public class NavigatorUI extends JPanel {
     private String algorithm = "Dijkstra";
 
     private final JLabel out = new JLabel("Pick two locations to compute the shortest route.");
+    private final JLabel compare = new JLabel(" ");
     private final GraphView graph = new GraphView();
 
     public NavigatorUI(NativeBridge nb, JLayeredPane layers) {
@@ -103,8 +104,13 @@ public class NavigatorUI extends JPanel {
         ModernButton run = new ModernButton("Compute Route", Theme.ACCENT, Theme.ACCENT_2);
         run.addActionListener(e -> compute());
 
+        ModernButton cmp = new ModernButton("Compare", Theme.CARD, Theme.CARD_2);
+        cmp.addActionListener(e -> compare());
+
         out.setForeground(Theme.TEXT);
         out.setBorder(BorderFactory.createEmptyBorder(0, 12, 0, 0));
+        compare.setForeground(Theme.MUTED);
+        compare.setBorder(BorderFactory.createEmptyBorder(0, 12, 0, 0));
 
         top.add(l1);
         top.add(l2);
@@ -113,7 +119,9 @@ public class NavigatorUI extends JPanel {
         top.add(bBfs);
         top.add(bDij);
         top.add(run);
+        top.add(cmp);
         top.add(out);
+        top.add(compare);
 
         graph.setPreferredSize(new Dimension(10, 10));
         JPanel graphWrap = new JPanel(new BorderLayout());
@@ -139,8 +147,10 @@ public class NavigatorUI extends JPanel {
                 bBfs.setBounds(w - 360, 38, 76, 36);
                 bDij.setBounds(w - 276, 38, 110, 36);
 
+                cmp.setBounds(w - 260, 84, 96, 34);
                 run.setBounds(w - 152, 38, 140, 36);
-                out.setBounds(18, 88, w - 36, 32);
+                out.setBounds(18, 88, w - 290, 22);
+                compare.setBounds(18, 108, w - 36, 18);
             }
         });
 
@@ -173,16 +183,57 @@ public class NavigatorUI extends JPanel {
             return;
         }
 
-        int dist = JsonMini.asInt(o.get("distance"), -1);
+        int hops = JsonMini.asInt(o.get("hops"), -1);
+        int cost = JsonMini.asInt(o.get("cost"), -1);
         java.util.List<String> path = JsonMini.arrStrings(o.get("path"));
         java.util.List<String> visited = JsonMini.arrStrings(o.get("visited"));
 
         if ("BFS".equals(JsonMini.asString(o.get("algorithm")))) {
-            out.setText("BFS hops: " + dist + "   •   Path: " + String.join(" → ", path));
+            out.setText("BFS: hops " + hops + " • cost " + cost + "   •   Path: " + String.join(" → ", path));
         } else {
-            out.setText("Distance: " + dist + "   •   Path: " + String.join(" → ", path));
+            out.setText("Dijkstra: cost " + cost + " • hops " + hops + "   •   Path: " + String.join(" → ", path));
         }
+        compare.setText("Tip: click Compare to see both algorithms at once.");
         graph.animateResult(path, visited);
+    }
+
+    private void compare() {
+        String a = (String) src.getSelectedItem();
+        String b = (String) dst.getSelectedItem();
+        if (a == null || b == null) {
+            Toast.show(layers, "Pick both source and destination.", Theme.DANGER);
+            return;
+        }
+        if (a.equals(b)) {
+            Toast.show(layers, "Source and destination must be different.", Theme.DANGER);
+            return;
+        }
+
+        java.util.Map<String, String> bfs = JsonMini.obj(nb.navShortestPath(a, b, "BFS"));
+        java.util.Map<String, String> dij = JsonMini.obj(nb.navShortestPath(a, b, "Dijkstra"));
+        if (!JsonMini.asBool(bfs.get("ok")) || !JsonMini.asBool(dij.get("ok"))) {
+            Toast.show(layers, "Comparison failed (route not found).", Theme.DANGER);
+            return;
+        }
+
+        int bfsHops = JsonMini.asInt(bfs.get("hops"), -1);
+        int bfsCost = JsonMini.asInt(bfs.get("cost"), -1);
+        int dijHops = JsonMini.asInt(dij.get("hops"), -1);
+        int dijCost = JsonMini.asInt(dij.get("cost"), -1);
+
+        java.util.List<String> bfsPath = JsonMini.arrStrings(bfs.get("path"));
+        java.util.List<String> dijPath = JsonMini.arrStrings(dij.get("path"));
+        java.util.List<String> visited = JsonMini.arrStrings(dij.get("visited")); // dijkstra visited looks nicer for demo
+
+        out.setText("Compare: BFS(hops " + bfsHops + ", cost " + bfsCost + ") vs Dijkstra(cost " + dijCost + ", hops " + dijHops + ")");
+        String winner = (dijCost >= 0 && bfsCost >= 0 && dijCost <= bfsCost) ? "Dijkstra wins for cost" : "BFS may be shorter in hops";
+        compare.setText(winner + "  •  Purple=primary (current toggle), Cyan=dashed=other");
+
+        // Primary = currently selected algorithm, secondary = other
+        boolean primaryIsBfs = "BFS".equals(algorithm);
+        java.util.List<String> primary = primaryIsBfs ? bfsPath : dijPath;
+        java.util.List<String> secondary = primaryIsBfs ? dijPath : bfsPath;
+        graph.animateCompare(primary, secondary, visited);
     }
 
     private static String[] safe(String[] a) {
