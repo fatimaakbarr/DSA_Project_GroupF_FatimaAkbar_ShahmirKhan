@@ -33,15 +33,15 @@ JNIEXPORT jstring JNICALL Java_NativeBridge_getShortestPath(JNIEnv* env, jobject
   std::vector<std::string> visQuoted;
   for (const auto& s : pr.visitedOrder) visQuoted.push_back(quote(s));
 
-  std::string out = obj({
-      {"ok", pr.distance >= 0 ? "true" : "false"},
-      {"algorithm", quote(pr.algorithm)},
-      {"distance", std::to_string(pr.distance)},
-      {"hops", std::to_string(pr.hops)},
-      {"cost", std::to_string(pr.cost)},
-      {"path", arr(pathQuoted)},
-      {"visited", arr(visQuoted)},
-  });
+  std::vector<Kv> kv;
+  kv.push_back(Kv{"ok", pr.distance >= 0 ? "true" : "false"});
+  kv.push_back(Kv{"algorithm", quote(pr.algorithm)});
+  kv.push_back(Kv{"distance", std::to_string(pr.distance)});
+  kv.push_back(Kv{"hops", std::to_string(pr.hops)});
+  kv.push_back(Kv{"cost", std::to_string(pr.cost)});
+  kv.push_back(Kv{"path", arr(pathQuoted)});
+  kv.push_back(Kv{"visited", arr(visQuoted)});
+  std::string out = obj(kv);
   return env->NewStringUTF(out.c_str());
 }
 
@@ -70,11 +70,11 @@ JNIEXPORT jstring JNICALL Java_NativeBridge_navShortestPath(JNIEnv* env, jobject
 
   using namespace jsonutil;
   if (pr.distance < 0 || pr.path.empty()) {
-    std::string out = obj({
-        {"ok", "false"},
-        {"error", quote("No route found (check locations).")},
-        {"algorithm", quote(pr.algorithm)},
-    });
+    std::vector<Kv> kv;
+    kv.push_back(Kv{"ok", "false"});
+    kv.push_back(Kv{"error", quote("No route found (check locations).")});
+    kv.push_back(Kv{"algorithm", quote(pr.algorithm)});
+    std::string out = obj(kv);
     return env->NewStringUTF(out.c_str());
   }
 
@@ -83,15 +83,15 @@ JNIEXPORT jstring JNICALL Java_NativeBridge_navShortestPath(JNIEnv* env, jobject
   std::vector<std::string> visQuoted;
   for (const auto& s : pr.visitedOrder) visQuoted.push_back(quote(s));
 
-  std::string out = obj({
-      {"ok", "true"},
-      {"algorithm", quote(pr.algorithm)},
-      {"distance", std::to_string(pr.distance)},
-      {"hops", std::to_string(pr.hops)},
-      {"cost", std::to_string(pr.cost)},
-      {"path", arr(pathQuoted)},
-      {"visited", arr(visQuoted)},
-  });
+  std::vector<Kv> kv;
+  kv.push_back(Kv{"ok", "true"});
+  kv.push_back(Kv{"algorithm", quote(pr.algorithm)});
+  kv.push_back(Kv{"distance", std::to_string(pr.distance)});
+  kv.push_back(Kv{"hops", std::to_string(pr.hops)});
+  kv.push_back(Kv{"cost", std::to_string(pr.cost)});
+  kv.push_back(Kv{"path", arr(pathQuoted)});
+  kv.push_back(Kv{"visited", arr(visQuoted)});
+  std::string out = obj(kv);
   return env->NewStringUTF(out.c_str());
 }
 
@@ -112,10 +112,10 @@ JNIEXPORT jstring JNICALL Java_NativeBridge_sisUpsertStudent(JNIEnv* env, jobjec
   backend().attendance.registerStudent(r.roll, r.name);
 
   using namespace jsonutil;
-  std::string out = obj({
-      {"ok", "true"},
-      {"action", quote(inserted ? "inserted" : "updated")},
-  });
+  std::vector<Kv> kv;
+  kv.push_back(Kv{"ok", "true"});
+  kv.push_back(Kv{"action", quote(inserted ? "inserted" : "updated")});
+  std::string out = obj(kv);
   return env->NewStringUTF(out.c_str());
 }
 
@@ -124,12 +124,12 @@ JNIEXPORT jstring JNICALL Java_NativeBridge_sisGetStudent(JNIEnv* env, jobject, 
   if (!backend().students.find((int)roll, r)) return env->NewStringUTF("");
 
   using namespace jsonutil;
-  std::string out = obj({
-      {"roll", std::to_string(r.roll)},
-      {"name", quote(r.name)},
-      {"program", quote(r.program)},
-      {"year", std::to_string(r.year)},
-  });
+  std::vector<Kv> kv;
+  kv.push_back(Kv{"roll", std::to_string(r.roll)});
+  kv.push_back(Kv{"name", quote(r.name)});
+  kv.push_back(Kv{"program", quote(r.program)});
+  kv.push_back(Kv{"year", std::to_string(r.year)});
+  std::string out = obj(kv);
   return env->NewStringUTF(out.c_str());
 }
 
@@ -139,10 +139,10 @@ JNIEXPORT jstring JNICALL Java_NativeBridge_sisDeleteStudent(JNIEnv* env, jobjec
     backend().attendance.removeStudent((int)roll);
   }
   using namespace jsonutil;
-  std::string out = obj({
-      {"ok", removed ? "true" : "false"},
-      {"message", quote(removed ? "Student removed." : "Student not found.")},
-  });
+  std::vector<Kv> kv;
+  kv.push_back(Kv{"ok", removed ? "true" : "false"});
+  kv.push_back(Kv{"message", quote(removed ? "Student removed." : "Student not found.")});
+  std::string out = obj(kv);
   return env->NewStringUTF(out.c_str());
 }
 
@@ -152,12 +152,12 @@ JNIEXPORT jstring JNICALL Java_NativeBridge_sisListStudents(JNIEnv* env, jobject
   std::vector<std::string> items;
   items.reserve(all.size());
   for (const auto& r : all) {
-    items.push_back(obj({
-        {"roll", std::to_string(r.roll)},
-        {"name", quote(r.name)},
-        {"program", quote(r.program)},
-        {"year", std::to_string(r.year)},
-    }));
+    std::vector<Kv> kv;
+    kv.push_back(Kv{"roll", std::to_string(r.roll)});
+    kv.push_back(Kv{"name", quote(r.name)});
+    kv.push_back(Kv{"program", quote(r.program)});
+    kv.push_back(Kv{"year", std::to_string(r.year)});
+    items.push_back(obj(kv));
   }
   return env->NewStringUTF(arr(items).c_str());
 }
@@ -179,28 +179,28 @@ JNIEXPORT jstring JNICALL Java_NativeBridge_attRegisterStudent(JNIEnv* env, jobj
   env->ReleaseStringUTFChars(name, n);
 
   using namespace jsonutil;
-  return env->NewStringUTF(obj({
-      {"ok", "true"},
-      {"action", quote(inserted ? "registered" : "updated")},
-  }).c_str());
+  std::vector<Kv> kv;
+  kv.push_back(Kv{"ok", "true"});
+  kv.push_back(Kv{"action", quote(inserted ? "registered" : "updated")});
+  return env->NewStringUTF(obj(kv).c_str());
 }
 
 JNIEXPORT jstring JNICALL Java_NativeBridge_attNewSessionDay(JNIEnv* env, jobject) {
   bool ok = backend().attendance.incrementTotalForAll();
   using namespace jsonutil;
-  return env->NewStringUTF(obj({
-      {"ok", ok ? "true" : "false"},
-      {"message", quote(ok ? "New class day recorded." : "No students registered.")},
-  }).c_str());
+  std::vector<Kv> kv;
+  kv.push_back(Kv{"ok", ok ? "true" : "false"});
+  kv.push_back(Kv{"message", quote(ok ? "New class day recorded." : "No students registered.")});
+  return env->NewStringUTF(obj(kv).c_str());
 }
 
 JNIEXPORT jstring JNICALL Java_NativeBridge_attMarkPresent(JNIEnv* env, jobject, jint roll) {
   bool ok = backend().attendance.markPresent((int)roll);
   using namespace jsonutil;
-  return env->NewStringUTF(obj({
-      {"ok", ok ? "true" : "false"},
-      {"message", quote(ok ? "Marked present." : "Roll not found.")},
-  }).c_str());
+  std::vector<Kv> kv;
+  kv.push_back(Kv{"ok", ok ? "true" : "false"});
+  kv.push_back(Kv{"message", quote(ok ? "Marked present." : "Roll not found.")});
+  return env->NewStringUTF(obj(kv).c_str());
 }
 
 JNIEXPORT jstring JNICALL Java_NativeBridge_attGetSummary(JNIEnv* env, jobject, jint roll) {
@@ -208,13 +208,13 @@ JNIEXPORT jstring JNICALL Java_NativeBridge_attGetSummary(JNIEnv* env, jobject, 
   if (!backend().attendance.getSummary((int)roll, s)) return env->NewStringUTF("");
 
   using namespace jsonutil;
-  return env->NewStringUTF(obj({
-      {"roll", std::to_string(s.roll)},
-      {"name", quote(s.name)},
-      {"present", std::to_string(s.present)},
-      {"total", std::to_string(s.total)},
-      {"percent", std::to_string(s.percent)},
-  }).c_str());
+  std::vector<Kv> kv;
+  kv.push_back(Kv{"roll", std::to_string(s.roll)});
+  kv.push_back(Kv{"name", quote(s.name)});
+  kv.push_back(Kv{"present", std::to_string(s.present)});
+  kv.push_back(Kv{"total", std::to_string(s.total)});
+  kv.push_back(Kv{"percent", std::to_string(s.percent)});
+  return env->NewStringUTF(obj(kv).c_str());
 }
 
 JNIEXPORT jstring JNICALL Java_NativeBridge_attGetDefaulters(JNIEnv* env, jobject, jint minPercent) {
@@ -223,13 +223,13 @@ JNIEXPORT jstring JNICALL Java_NativeBridge_attGetDefaulters(JNIEnv* env, jobjec
   std::vector<std::string> items;
   items.reserve(list.size());
   for (const auto& s : list) {
-    items.push_back(obj({
-        {"roll", std::to_string(s.roll)},
-        {"name", quote(s.name)},
-        {"present", std::to_string(s.present)},
-        {"total", std::to_string(s.total)},
-        {"percent", std::to_string(s.percent)},
-    }));
+    std::vector<Kv> kv;
+    kv.push_back(Kv{"roll", std::to_string(s.roll)});
+    kv.push_back(Kv{"name", quote(s.name)});
+    kv.push_back(Kv{"present", std::to_string(s.present)});
+    kv.push_back(Kv{"total", std::to_string(s.total)});
+    kv.push_back(Kv{"percent", std::to_string(s.percent)});
+    items.push_back(obj(kv));
   }
   return env->NewStringUTF(arr(items).c_str());
 }

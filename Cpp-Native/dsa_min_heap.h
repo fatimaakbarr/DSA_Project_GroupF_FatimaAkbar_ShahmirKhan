@@ -1,12 +1,17 @@
 #pragma once
 
-#include <stdexcept>
-#include <utility>
 #include <vector>
 
 // Level-2 DSA: Min-Heap / Priority Queue (custom)
 
 namespace dsa {
+
+template <typename T>
+inline void swapT(T& a, T& b) {
+  T tmp = a;
+  a = b;
+  b = tmp;
+}
 
 template <typename T, typename Less>
 class MinHeap {
@@ -17,7 +22,7 @@ class MinHeap {
     while (i > 0) {
       size_t p = (i - 1) / 2;
       if (!less_(a_[i], a_[p])) break;
-      std::swap(a_[i], a_[p]);
+      swapT(a_[i], a_[p]);
       i = p;
     }
   }
@@ -31,7 +36,7 @@ class MinHeap {
       if (l < n && less_(a_[l], a_[best])) best = l;
       if (r < n && less_(a_[r], a_[best])) best = r;
       if (best == i) break;
-      std::swap(a_[i], a_[best]);
+      swapT(a_[i], a_[best]);
       i = best;
     }
   }
@@ -48,7 +53,7 @@ class MinHeap {
   }
 
   T popMin() {
-    if (a_.empty()) throw std::runtime_error("Heap underflow");
+    // Precondition: not empty (callers ensure this).
     T out = a_.front();
     a_.front() = a_.back();
     a_.pop_back();

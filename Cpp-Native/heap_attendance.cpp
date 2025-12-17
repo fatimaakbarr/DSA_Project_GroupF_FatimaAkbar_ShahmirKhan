@@ -1,7 +1,5 @@
 #include "heap_attendance.h"
 
-#include <stdexcept>
-
 AttendanceManager::AttendanceManager() {
   seedDefault();
 }

@@ -1,6 +1,8 @@
 #include "avl_tree.h"
 
-#include <algorithm>
+// Only <string>, <vector>, <iostream> are allowed by course rules.
+
+static inline int imax(int a, int b) { return a > b ? a : b; }
 
 AvlStudentDB::~AvlStudentDB() {
   destroy(root_);
@@ -13,7 +15,7 @@ int AvlStudentDB::bf(Node* n) { return n ? height(n->left) - height(n->right) : 
 
 void AvlStudentDB::update(Node* n) {
   if (!n) return;
-  n->h = 1 + std::max(height(n->left), height(n->right));
+  n->h = 1 + imax(height(n->left), height(n->right));
 }
 
 AvlStudentDB::Node* AvlStudentDB::rotateRight(Node* y) {

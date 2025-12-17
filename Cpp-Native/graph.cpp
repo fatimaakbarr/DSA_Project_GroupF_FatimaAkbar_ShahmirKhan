@@ -1,7 +1,6 @@
 #include "graph.h"
 
-#include <algorithm>
-#include <climits>
+// Only <string>, <vector>, <iostream> are allowed by course rules.
 
 CampusGraph::CampusGraph() {
   seedDefault();
@@ -75,7 +74,8 @@ PathResult CampusGraph::bfsShortestPath(const std::string& src, const std::strin
 
   int n = static_cast<int>(nameOf_.size());
   std::vector<int> prev(n, -1);
-  std::vector<int> dist(n, INT_MAX);
+  const int INF = 1000000000;
+  std::vector<int> dist(n, INF);
   std::vector<bool> vis(n, false);
 
   // Level-1: Queue
@@ -103,7 +103,12 @@ PathResult CampusGraph::bfsShortestPath(const std::string& src, const std::strin
 
   std::vector<std::string> path;
   for (int cur = t; cur != -1; cur = prev[cur]) path.push_back(nameOf_[cur]);
-  std::reverse(path.begin(), path.end());
+  // manual reverse
+  for (size_t i = 0, j = path.size() ? path.size() - 1 : 0; i < j; i++, j--) {
+    std::string tmp = path[i];
+    path[i] = path[j];
+    path[j] = tmp;
+  }
 
   res.path = std::move(path);
   res.hops = dist[t];
@@ -131,7 +136,8 @@ PathResult CampusGraph::dijkstraShortestPath(const std::string& src, const std::
 
   int n = static_cast<int>(nameOf_.size());
   std::vector<int> prev(n, -1);
-  std::vector<int> dist(n, INT_MAX);
+  const int INF = 1000000000;
+  std::vector<int> dist(n, INF);
 
   struct NodeDist { int d; int v; };
   struct Less { bool operator()(const NodeDist& a, const NodeDist& b) const { return a.d < b.d; } };
@@ -153,7 +159,7 @@ PathResult CampusGraph::dijkstraShortestPath(const std::string& src, const std::
 
     for (auto it = adj_[u].begin(); it != adj_[u].end(); ++it) {
       const Edge& e = *it;
-      if (dist[u] != INT_MAX && dist[u] + e.w < dist[e.to]) {
+      if (dist[u] != INF && dist[u] + e.w < dist[e.to]) {
         dist[e.to] = dist[u] + e.w;
         prev[e.to] = u;
         pq.push(NodeDist{dist[e.to], e.to});
@@ -161,11 +167,16 @@ PathResult CampusGraph::dijkstraShortestPath(const std::string& src, const std::
     }
   }
 
-  if (dist[t] == INT_MAX) return res;
+  if (dist[t] == INF) return res;
 
   std::vector<std::string> path;
   for (int cur = t; cur != -1; cur = prev[cur]) path.push_back(nameOf_[cur]);
-  std::reverse(path.begin(), path.end());
+  // manual reverse
+  for (size_t i = 0, j = path.size() ? path.size() - 1 : 0; i < j; i++, j--) {
+    std::string tmp = path[i];
+    path[i] = path[j];
+    path[j] = tmp;
+  }
 
   res.path = std::move(path);
   res.cost = dist[t];

@@ -1,11 +1,6 @@
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <functional>
-#include <stdexcept>
 #include <string>
-#include <utility>
 #include <vector>
 
 // Level-1 DSAs (custom): LinkedList, HashMap, Queue + helper sorting/searching.
@@ -97,10 +92,10 @@ class LinkedList {
 
 // ---------------- HashMap (open addressing) ----------------
 
-inline uint64_t fnv1a64(const std::string& s) {
-  uint64_t h = 1469598103934665603ULL;
+inline unsigned long long fnv1a64(const std::string& s) {
+  unsigned long long h = 1469598103934665603ULL;
   for (unsigned char c : s) {
-    h ^= static_cast<uint64_t>(c);
+    h ^= static_cast<unsigned long long>(c);
     h *= 1099511628211ULL;
   }
   return h;
@@ -108,12 +103,12 @@ inline uint64_t fnv1a64(const std::string& s) {
 
 template <typename V>
 class HashMap {
-  enum class State : uint8_t { Empty = 0, Filled = 1, Deleted = 2 };
+  enum State { Empty = 0, Filled = 1, Deleted = 2 };
 
   struct Slot {
     std::string key;
     V value;
-    State state = State::Empty;
+    State state = Empty;
   };
 
   std::vector<Slot> table_;
@@ -126,7 +121,7 @@ class HashMap {
     used_ = 0;
     occupied_ = 0;
     for (auto& s : old) {
-      if (s.state == State::Filled) {
+      if (s.state == Filled) {
         put(s.key, s.value);
       }
     }
@@ -151,13 +146,13 @@ class HashMap {
 
   bool get(const std::string& key, V& out) const {
     if (table_.empty()) return false;
-    uint64_t h = fnv1a64(key);
+    unsigned long long h = fnv1a64(key);
     size_t cap = table_.size();
     size_t idx = static_cast<size_t>(h % cap);
     for (size_t step = 0; step < cap; step++) {
       const Slot& s = table_[idx];
-      if (s.state == State::Empty) return false;
-      if (s.state == State::Filled && s.key == key) {
+      if (s.state == Empty) return false;
+      if (s.state == Filled && s.key == key) {
         out = s.value;
         return true;
       }
@@ -168,7 +163,7 @@ class HashMap {
 
   void put(const std::string& key, const V& value) {
     ensureCapacity();
-    uint64_t h = fnv1a64(key);
+    unsigned long long h = fnv1a64(key);
     size_t cap = table_.size();
     size_t idx = static_cast<size_t>(h % cap);
 
@@ -176,19 +171,19 @@ class HashMap {
 
     for (size_t step = 0; step < cap; step++) {
       Slot& s = table_[idx];
-      if (s.state == State::Filled) {
+      if (s.state == Filled) {
         if (s.key == key) {
           s.value = value;
           return;
         }
-      } else if (s.state == State::Deleted) {
+      } else if (s.state == Deleted) {
         if (firstDeleted == static_cast<size_t>(-1)) firstDeleted = idx;
       } else { // Empty
         if (firstDeleted != static_cast<size_t>(-1)) idx = firstDeleted;
         Slot& t = table_[idx];
         t.key = key;
         t.value = value;
-        t.state = State::Filled;
+        t.state = Filled;
         used_++;
         occupied_++;
         return;
@@ -203,14 +198,14 @@ class HashMap {
 
   bool erase(const std::string& key) {
     if (table_.empty()) return false;
-    uint64_t h = fnv1a64(key);
+    unsigned long long h = fnv1a64(key);
     size_t cap = table_.size();
     size_t idx = static_cast<size_t>(h % cap);
     for (size_t step = 0; step < cap; step++) {
       Slot& s = table_[idx];
-      if (s.state == State::Empty) return false;
-      if (s.state == State::Filled && s.key == key) {
-        s.state = State::Deleted;
+      if (s.state == Empty) return false;
+      if (s.state == Filled && s.key == key) {
+        s.state = Deleted;
         s.key.clear();
         used_--;
         return true;
@@ -224,7 +219,7 @@ class HashMap {
     std::vector<std::string> out;
     out.reserve(used_);
     for (const auto& s : table_) {
-      if (s.state == State::Filled) out.push_back(s.key);
+      if (s.state == Filled) out.push_back(s.key);
     }
     return out;
   }
@@ -262,37 +257,12 @@ class Queue {
   }
 
   T pop() {
-    if (size_ == 0) throw std::runtime_error("Queue underflow");
+    // Precondition: not empty (callers ensure this).
     T v = buf_[head_];
     head_ = (head_ + 1) % buf_.size();
     size_--;
     return v;
   }
 };
-
-// ---------------- Merge sort (Level-1 algo) ----------------
-
-template <typename T, typename Less>
-void mergeSort(std::vector<T>& a, Less less) {
-  if (a.size() < 2) return;
-  std::vector<T> tmp(a.size());
-
-  std::function<void(size_t, size_t)> sortRec = [&](size_t l, size_t r) {
-    if (r - l <= 1) return;
-    size_t m = (l + r) / 2;
-    sortRec(l, m);
-    sortRec(m, r);
-    size_t i = l, j = m, k = l;
-    while (i < m && j < r) {
-      if (less(a[i], a[j])) tmp[k++] = a[i++];
-      else tmp[k++] = a[j++];
-    }
-    while (i < m) tmp[k++] = a[i++];
-    while (j < r) tmp[k++] = a[j++];
-    for (size_t t = l; t < r; t++) a[t] = tmp[t];
-  };
-
-  sortRec(0, a.size());
-}
 
 } // namespace dsa

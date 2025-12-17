@@ -19,6 +19,7 @@ public class NavigatorUI extends JPanel {
 
     private final JLabel out = new JLabel("Pick two locations to compute the shortest route.");
     private final JLabel compare = new JLabel(" ");
+    private final ChipRow chips = new ChipRow();
     private final GraphView graph = new GraphView();
 
     public NavigatorUI(NativeBridge nb, JLayeredPane layers) {
@@ -122,6 +123,7 @@ public class NavigatorUI extends JPanel {
         top.add(cmp);
         top.add(out);
         top.add(compare);
+        top.add(chips);
 
         graph.setPreferredSize(new Dimension(10, 10));
         JPanel graphWrap = new JPanel(new BorderLayout());
@@ -151,6 +153,7 @@ public class NavigatorUI extends JPanel {
                 run.setBounds(w - 152, 38, 140, 36);
                 out.setBounds(18, 88, w - 290, 22);
                 compare.setBounds(18, 108, w - 36, 18);
+                chips.setBounds(18, 8, w - 36, 22);
             }
         });
 
@@ -194,6 +197,8 @@ public class NavigatorUI extends JPanel {
             out.setText("Dijkstra: cost " + cost + " • hops " + hops + "   •   Path: " + String.join(" → ", path));
         }
         compare.setText("Tip: click Compare to see both algorithms at once.");
+        chips.setChips(new String[] { "Visited: " + visited.size(), "Hops: " + hops, "Cost: " + cost },
+                new java.awt.Color[] { Theme.ACCENT_2, Theme.CARD_2, Theme.CARD_2 });
         graph.animateResult(path, visited);
     }
 
@@ -226,14 +231,64 @@ public class NavigatorUI extends JPanel {
         java.util.List<String> visited = JsonMini.arrStrings(dij.get("visited")); // dijkstra visited looks nicer for demo
 
         out.setText("Compare: BFS(hops " + bfsHops + ", cost " + bfsCost + ") vs Dijkstra(cost " + dijCost + ", hops " + dijHops + ")");
-        String winner = (dijCost >= 0 && bfsCost >= 0 && dijCost <= bfsCost) ? "Dijkstra wins for cost" : "BFS may be shorter in hops";
-        compare.setText(winner + "  •  Purple=primary (current toggle), Cyan=dashed=other");
+        boolean costWinnerDij = (dijCost >= 0 && bfsCost >= 0 && dijCost <= bfsCost);
+        boolean hopWinnerBfs = (bfsHops >= 0 && dijHops >= 0 && bfsHops <= dijHops);
+        compare.setText("Purple=primary (toggle) • Cyan dashed=other • Use chips to explain the difference");
+
+        String chip1 = costWinnerDij ? "Best cost: Dijkstra" : "Best cost: BFS path";
+        String chip2 = hopWinnerBfs ? "Fewest hops: BFS" : "Fewest hops: Dijkstra";
+        int bfsVisited = JsonMini.arrStrings(bfs.get("visited")).size();
+        int dijVisited = JsonMini.arrStrings(dij.get("visited")).size();
+        String chip3 = "Visited nodes: BFS " + bfsVisited + " • Dij " + dijVisited;
+        chips.setChips(new String[] { chip1, chip2, chip3 }, new java.awt.Color[] { Theme.ACCENT, Theme.ACCENT_2, Theme.CARD_2 });
 
         // Primary = currently selected algorithm, secondary = other
         boolean primaryIsBfs = "BFS".equals(algorithm);
         java.util.List<String> primary = primaryIsBfs ? bfsPath : dijPath;
         java.util.List<String> secondary = primaryIsBfs ? dijPath : bfsPath;
         graph.animateCompare(primary, secondary, visited);
+    }
+
+    // Premium chips row
+    private static final class ChipRow extends JComponent {
+        private String[] labels = new String[0];
+        private java.awt.Color[] colors = new java.awt.Color[0];
+
+        void setChips(String[] labels, java.awt.Color[] colors) {
+            this.labels = labels == null ? new String[0] : labels;
+            this.colors = colors == null ? new java.awt.Color[0] : colors;
+            repaint();
+        }
+
+        @Override
+        protected void paintComponent(java.awt.Graphics g) {
+            java.awt.Graphics2D g2 = (java.awt.Graphics2D) g.create();
+            g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setFont(getFont().deriveFont(java.awt.Font.BOLD, 11.5f));
+
+            int x = 0;
+            int y = 0;
+            int h = getHeight();
+            for (int i = 0; i < labels.length; i++) {
+                String s = labels[i] == null ? "" : labels[i];
+                int w = g2.getFontMetrics().stringWidth(s) + 18;
+                java.awt.Color c = (i < colors.length && colors[i] != null) ? colors[i] : Theme.CARD_2;
+
+                g2.setColor(new java.awt.Color(0, 0, 0, 85));
+                g2.fillRoundRect(x, y, w, h, 999, 999);
+                g2.setColor(new java.awt.Color(c.getRed(), c.getGreen(), c.getBlue(), 140));
+                g2.fillRoundRect(x, y, 6, h, 999, 999);
+                g2.setColor(Theme.BORDER);
+                g2.drawRoundRect(x, y, w - 1, h - 1, 999, 999);
+
+                g2.setColor(Theme.TEXT);
+                g2.drawString(s, x + 12, y + h - 7);
+
+                x += w + 10;
+                if (x > getWidth() - 40) break;
+            }
+            g2.dispose();
+        }
     }
 
     private static String[] safe(String[] a) {
