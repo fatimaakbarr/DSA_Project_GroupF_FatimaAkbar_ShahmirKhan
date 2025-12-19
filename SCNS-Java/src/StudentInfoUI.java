@@ -15,7 +15,6 @@ import javax.swing.JLayeredPane;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.text.AbstractDocument;
@@ -32,11 +31,7 @@ public class StudentInfoUI extends JPanel {
     private final JTextField program = field("Program (e.g. BSCS)");
     private final JTextField year = field("Semester (1-8)");
 
-    private final DefaultTableModel model = new DefaultTableModel(new Object[] { "Roll", "Name", "Program", "Semester", "Present", "Total", "%" }, 0) {
-        @Override
-        public boolean isCellEditable(int row, int column) { return false; }
-    };
-    private final JTable table = new JTable(model);
+    private final FolderCabinetView cabinet = new FolderCabinetView();
 
     public StudentInfoUI(NativeBridge nb, JLayeredPane layers) {
         this.nb = nb;
@@ -45,7 +40,7 @@ public class StudentInfoUI extends JPanel {
         setOpaque(false);
         setLayout(null);
 
-        UIStyle.table(table);
+        // Student module now uses file-cabinet metaphor (no table).
 
         // Input hardening (prevents strings in numeric fields)
         applyNumericFilter(roll, 9);  // roll up to 9 digits
@@ -181,15 +176,13 @@ public class StudentInfoUI extends JPanel {
         gc.insets = new Insets(0, 12, 12, 12);
         form.add(hint, gc);
 
-        JScrollPane sp = new JScrollPane(table);
-        sp.setBorder(BorderFactory.createEmptyBorder());
+        JScrollPane sp = new JScrollPane(cabinet);
+        UIStyle.scrollPane(sp);
         sp.getViewport().setBackground(Theme.CARD);
-        table.setBackground(Theme.CARD);
-        table.setForeground(Theme.TEXT);
 
         JPanel listCard = new CardPanel();
         listCard.setLayout(new BorderLayout());
-        JLabel tl = new JLabel("Records (sorted by roll)");
+        JLabel tl = new JLabel("Record Cabinet (sorted by roll)");
         tl.setBorder(BorderFactory.createEmptyBorder(10, 12, 8, 12));
         tl.setForeground(Theme.TEXT);
         tl.setFont(tl.getFont().deriveFont(Font.BOLD, 13f));
@@ -236,9 +229,24 @@ public class StudentInfoUI extends JPanel {
 
         String res = nb.sisUpsertStudent(r, n, p, y);
         Map<String, String> o = JsonMini.obj(res);
-        if (JsonMini.asBool(o.get("ok"))) Toast.show(layers, JsonMini.asString(o.getOrDefault("message", "Student added.")), Theme.OK);
-        else Toast.show(layers, JsonMini.asString(o.getOrDefault("message", "Insert failed.")), Theme.DANGER);
-        refresh();
+        if (JsonMini.asBool(o.get("ok"))) {
+            Toast.show(layers, JsonMini.asString(o.getOrDefault("message", "Student added.")), Theme.OK);
+            // animate insert into cabinet
+            String js = nb.sisGetStudent(r);
+            Map<String, String> so = JsonMini.obj(js);
+            FolderCabinetView.Record rr = new FolderCabinetView.Record();
+            rr.roll = JsonMini.asInt(so.get("roll"), r);
+            rr.name = JsonMini.asString(so.get("name"));
+            rr.program = JsonMini.asString(so.get("program"));
+            rr.semester = JsonMini.asInt(so.get("year"), y);
+            rr.present = JsonMini.asInt(so.get("present"), 0);
+            rr.total = JsonMini.asInt(so.get("total"), 0);
+            // refresh list and animate reflow
+            refresh(true);
+            cabinet.animateInsert(rr, 0);
+        } else {
+            Toast.show(layers, JsonMini.asString(o.getOrDefault("message", "Insert failed.")), Theme.DANGER);
+        }
     }
 
     private void importCsv() {
@@ -278,6 +286,7 @@ public class StudentInfoUI extends JPanel {
         program.setText(JsonMini.asString(o.get("program")));
         year.setText(String.valueOf(JsonMini.asInt(o.get("year"), 1)));
         Toast.show(layers, "Record loaded.", Theme.OK);
+        cabinet.animateSearch(r);
     }
 
     private void delete() {
@@ -287,26 +296,27 @@ public class StudentInfoUI extends JPanel {
         Map<String, String> o = JsonMini.obj(json);
         if (JsonMini.asBool(o.get("ok"))) Toast.show(layers, JsonMini.asString(o.get("message")), Theme.OK);
         else Toast.show(layers, JsonMini.asString(o.get("message")), Theme.DANGER);
-        refresh();
+        if (JsonMini.asBool(o.get("ok"))) cabinet.animateDelete(r);
+        refresh(true);
     }
 
-    private void refresh() {
-        model.setRowCount(0);
+    private void refresh() { refresh(false); }
+
+    private void refresh(boolean animate) {
+        cabinet.clearSearch();
         List<Map<String, String>> arr = JsonMini.arrObjects(nb.sisListStudents());
+        List<FolderCabinetView.Record> recs = new ArrayList<>();
         for (Map<String, String> o : arr) {
-            int present = JsonMini.asInt(o.get("present"), 0);
-            int total = JsonMini.asInt(o.get("total"), 0);
-            int pct = total > 0 ? (present * 100 / total) : 0;
-            model.addRow(new Object[] {
-                    JsonMini.asInt(o.get("roll"), 0),
-                    JsonMini.asString(o.get("name")),
-                    JsonMini.asString(o.get("program")),
-                    JsonMini.asInt(o.get("year"), 1),
-                    present,
-                    total,
-                    pct
-            });
+            FolderCabinetView.Record r = new FolderCabinetView.Record();
+            r.roll = JsonMini.asInt(o.get("roll"), 0);
+            r.name = JsonMini.asString(o.get("name"));
+            r.program = JsonMini.asString(o.get("program"));
+            r.semester = JsonMini.asInt(o.get("year"), 1);
+            r.present = JsonMini.asInt(o.get("present"), 0);
+            r.total = JsonMini.asInt(o.get("total"), 0);
+            recs.add(r);
         }
+        cabinet.setRecords(recs, animate);
     }
 
     private static JTextField field(String placeholder) {

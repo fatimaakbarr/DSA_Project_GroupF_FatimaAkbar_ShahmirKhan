@@ -202,6 +202,22 @@ JNIEXPORT jstring JNICALL Java_NativeBridge_navShortestPath(JNIEnv* env, jobject
   return env->NewStringUTF(out.c_str());
 }
 
+JNIEXPORT jstring JNICALL Java_NativeBridge_navDivergenceReport(JNIEnv* env, jobject obj) {
+  Backend* bkend = getBackend(env, obj);
+  CampusGraph* g = bkend ? &bkend->nav : nullptr;
+  CampusGraph local;
+  CampusGraph* gg = g ? g : &local;
+
+  int totalPairs = 0, divergedPairs = 0, percent = 0;
+  gg->divergenceStats(totalPairs, divergedPairs, percent);
+
+  std::vector<Kv> kv;
+  kv.push_back(Kv{"totalPairs", std::to_string(totalPairs)});
+  kv.push_back(Kv{"divergedPairs", std::to_string(divergedPairs)});
+  kv.push_back(Kv{"percent", std::to_string(percent)});
+  return env->NewStringUTF(jsonutil::obj(kv).c_str());
+}
+
 // Insert-only (prevents overwrite) per requirements.
 JNIEXPORT jstring JNICALL Java_NativeBridge_sisUpsertStudent(JNIEnv* env, jobject obj, jint roll, jstring name, jstring program, jint year) {
   Backend* bkend = getBackend(env, obj);

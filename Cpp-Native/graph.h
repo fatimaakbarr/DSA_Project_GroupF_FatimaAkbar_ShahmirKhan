@@ -25,8 +25,9 @@ class CampusGraph {
   std::vector<std::string> locations() const;
 
   bool addLocation(const std::string& name);
-  // Adds edge to BOTH graphs (BFS adjacency + weighted adjacency) using the same weight.
-  // Prefer addEdgeBfs/addEdgeDijkstra in seedDefault when you need them to differ.
+  // Single consistent campus graph:
+  // - BFS treats this adjacency as unweighted (min hops)
+  // - Dijkstra uses weights (min total cost)
   bool addEdge(const std::string& a, const std::string& b, int w);
 
   // Exposed for building UI explanations (edge weights along a path).
@@ -36,21 +37,17 @@ class CampusGraph {
   PathResult bfsShortestPath(const std::string& src, const std::string& dst);
   PathResult dijkstraShortestPath(const std::string& src, const std::string& dst);
 
+  // Measures how often BFS picks fewer hops but higher cost than Dijkstra.
+  // Returns JSON-friendly fields: totalPairs, divergedPairs, percent.
+  void divergenceStats(int& totalPairs, int& divergedPairs, int& percent) const;
+
  private:
-  struct EdgeU { int to; };
   struct EdgeW { int to; int w; };
 
   // Level-1: HashMap for name->index, LinkedList adjacency lists
   dsa::HashMap<int> indexOf_;
   std::vector<std::string> nameOf_;
-  // Two separate graph models (required):
-  // - BFS uses adjBfs_ (unweighted)
-  // - Dijkstra uses adjW_ (weighted)
-  std::vector<dsa::LinkedList<EdgeU>> adjBfs_;
   std::vector<dsa::LinkedList<EdgeW>> adjW_;
-
-  bool addEdgeBfs(const std::string& a, const std::string& b);
-  bool addEdgeDijkstra(const std::string& a, const std::string& b, int w);
 
   // (kept as public above)
 };

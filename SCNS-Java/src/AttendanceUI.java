@@ -160,7 +160,7 @@ public class AttendanceUI extends JPanel {
         ringCard.add(ring, BorderLayout.CENTER);
 
         JScrollPane sp = new JScrollPane(table);
-        sp.setBorder(BorderFactory.createEmptyBorder());
+        UIStyle.scrollPane(sp);
         sp.getViewport().setBackground(Theme.CARD);
         table.setBackground(Theme.CARD);
         table.setForeground(Theme.TEXT);

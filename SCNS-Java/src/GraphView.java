@@ -45,6 +45,9 @@ public class GraphView extends JComponent {
     private float loserAlpha = 1f; // fades losing trail
     private String winner = "Dijkstra";
 
+    // Parkour-ish impact effects on nodes
+    private final Map<String, Float> impact = new HashMap<>();
+
     public GraphView() {
         setOpaque(false);
         idle = new javax.swing.Timer(16, e -> {
@@ -67,6 +70,7 @@ public class GraphView extends JComponent {
     public void animateTraversal(List<String> path, List<String> visited, List<Integer> edgeWeights, String mode) {
         raceMode = false;
         setMode(mode);
+        impact.clear();
         this.path.clear();
         if (path != null) this.path.addAll(path);
         this.path2.clear();
@@ -112,6 +116,7 @@ public class GraphView extends JComponent {
         raceMode = true;
         this.winner = (winner == null || winner.isEmpty()) ? "Dijkstra" : winner;
         this.loserAlpha = 1f;
+        this.impact.clear();
 
         this.path.clear();
         this.path2.clear();
@@ -165,6 +170,8 @@ public class GraphView extends JComponent {
                 int segMs = 220; // uniform
                 bfsEdgeT += (float) dt / (float) segMs;
                 if (bfsEdgeT >= 1f) { bfsEdgeIndex++; bfsEdgeT = 0f; }
+                // impact when landing on a node
+                if (bfsEdgeT == 0f && bfsEdgeIndex < bfsPath.size()) triggerImpact(bfsPath.get(bfsEdgeIndex));
             }
 
             if (dijEdges > 0 && dijEdgeIndex < dijEdges) {
@@ -173,6 +180,7 @@ public class GraphView extends JComponent {
                 int segMs = 120 + w * 45;
                 dijEdgeT += (float) dt / (float) segMs;
                 if (dijEdgeT >= 1f) { dijEdgeIndex++; dijEdgeT = 0f; }
+                if (dijEdgeT == 0f && dijEdgeIndex < dijPath.size()) triggerImpact(dijPath.get(dijEdgeIndex));
             }
 
             boolean bfsDone = (bfsEdges <= 0) || (bfsEdgeIndex >= bfsEdges);
@@ -204,7 +212,11 @@ public class GraphView extends JComponent {
         if (edgeT >= 1f) {
             edgeIndex++;
             edgeT = 0f;
+            if (edgeIndex < path.size()) triggerImpact(path.get(edgeIndex));
         }
+
+        // decay impacts
+        decayImpacts((float) dt / 1000f);
         repaint();
     }
 
@@ -239,18 +251,21 @@ public class GraphView extends JComponent {
         Color dijC = new Color(180, 110, 255);
         Color visitC = "Dijkstra".equalsIgnoreCase(mode) ? dijC : bfsC;
 
-        // Weighted campus edges: shorter = brighter/thicker
-        drawCampusEdge(g2, pos, "Gate", "Admin", 3);
-        drawCampusEdge(g2, pos, "Gate", "Library", 15);
-        drawCampusEdge(g2, pos, "Gate", "Ground", 2);
-        drawCampusEdge(g2, pos, "Ground", "Cafeteria", 2);
-        drawCampusEdge(g2, pos, "Cafeteria", "Library", 2);
-        drawCampusEdge(g2, pos, "Admin", "Block-A", 4);
-        drawCampusEdge(g2, pos, "Admin", "Block-B", 6);
-        drawCampusEdge(g2, pos, "Block-A", "Lab", 3);
+        // Base map edges (main roads + key shortcuts). We don't draw every \"shortcut\" edge to avoid clutter.
+        drawCampusEdge(g2, pos, "Gate", "Ground", 3);
+        drawCampusEdge(g2, pos, "Ground", "Cafeteria", 3);
+        drawCampusEdge(g2, pos, "Cafeteria", "Library", 3);
+        drawCampusEdge(g2, pos, "Gate", "Admin", 12);
+        drawCampusEdge(g2, pos, "Admin", "Library", 12);
+        drawCampusEdge(g2, pos, "Ground", "Admin", 2);
+        drawCampusEdge(g2, pos, "Admin", "Block-A", 2);
+        drawCampusEdge(g2, pos, "Admin", "Block-B", 2);
+        drawCampusEdge(g2, pos, "Block-A", "Lab", 2);
         drawCampusEdge(g2, pos, "Block-B", "Lab", 2);
-        drawCampusEdge(g2, pos, "Lab", "Hostel", 5);
-        drawCampusEdge(g2, pos, "Ground", "Hostel", 4);
+        drawCampusEdge(g2, pos, "Lab", "Gym", 2);
+        drawCampusEdge(g2, pos, "Gym", "Dorms", 2);
+        drawCampusEdge(g2, pos, "Dorms", "Hostel", 2);
+        drawCampusEdge(g2, pos, "Ground", "Hostel", 3);
 
         // Visited glow
         int visCount = Math.min(visited.size(), visIndex);
@@ -311,11 +326,12 @@ public class GraphView extends JComponent {
             }
         }
 
-        // nodes
+        // nodes (with impact bounce + dust puff)
         Font f = getFont().deriveFont(Font.BOLD, 12f);
         g2.setFont(f);
         for (String n : nodes) {
             double[] p = pos.get(n);
+            if (p == null) continue;
             boolean inPath = path.contains(n);
             boolean inPath2 = path2.contains(n);
             boolean isVisited = visited.contains(n);
@@ -323,15 +339,27 @@ public class GraphView extends JComponent {
             Color ring = inPath ? Theme.ACCENT : (inPath2 ? visitC : (isVisited ? visitC : new Color(90, 105, 140)));
             Color fill = new Color(12, 14, 24);
 
+            float it = impact.getOrDefault(n, 0f);
+            double bx = p[0];
+            double by = p[1] - 5 * Math.sin(Math.min(1, it) * Math.PI); // bounce
+
+            // dust puff
+            if (it > 0f) {
+                int da = (int) (70 * it);
+                g2.setColor(new Color(255, 255, 255, da));
+                g2.fill(new Ellipse2D.Double(bx - 18, by + 10, 10, 6));
+                g2.fill(new Ellipse2D.Double(bx + 6, by + 10, 12, 7));
+            }
+
             g2.setColor(fill);
-            g2.fill(new Ellipse2D.Double(p[0] - 12, p[1] - 12, 24, 24));
+            g2.fill(new Ellipse2D.Double(bx - 12, by - 12, 24, 24));
 
             g2.setStroke(new BasicStroke(2.2f));
             g2.setColor(ring);
-            g2.draw(new Ellipse2D.Double(p[0] - 12, p[1] - 12, 24, 24));
+            g2.draw(new Ellipse2D.Double(bx - 12, by - 12, 24, 24));
 
             g2.setColor(Theme.TEXT);
-            g2.drawString(n, (int) p[0] - 14, (int) p[1] - 16);
+            g2.drawString(n, (int) bx - 14, (int) by - 16);
         }
 
         g2.dispose();
@@ -347,12 +375,15 @@ public class GraphView extends JComponent {
         drawCampusEdge(g2, pos, "Gate", "Ground", 3);
         drawCampusEdge(g2, pos, "Ground", "Cafeteria", 3);
         drawCampusEdge(g2, pos, "Cafeteria", "Library", 3);
-        drawCampusEdge(g2, pos, "Admin", "Block-A", 6);
-        drawCampusEdge(g2, pos, "Admin", "Block-B", 8);
-        drawCampusEdge(g2, pos, "Block-A", "Lab", 5);
-        drawCampusEdge(g2, pos, "Block-B", "Lab", 4);
-        drawCampusEdge(g2, pos, "Lab", "Hostel", 9);
-        drawCampusEdge(g2, pos, "Ground", "Hostel", 7);
+        drawCampusEdge(g2, pos, "Ground", "Admin", 2);
+        drawCampusEdge(g2, pos, "Admin", "Block-A", 2);
+        drawCampusEdge(g2, pos, "Admin", "Block-B", 2);
+        drawCampusEdge(g2, pos, "Block-A", "Lab", 2);
+        drawCampusEdge(g2, pos, "Block-B", "Lab", 2);
+        drawCampusEdge(g2, pos, "Lab", "Gym", 2);
+        drawCampusEdge(g2, pos, "Gym", "Dorms", 2);
+        drawCampusEdge(g2, pos, "Dorms", "Hostel", 2);
+        drawCampusEdge(g2, pos, "Ground", "Hostel", 3);
 
         boolean bfsWins = "BFS".equalsIgnoreCase(winner);
         float bfsA = bfsWins ? 1f : loserAlpha;
@@ -464,6 +495,8 @@ public class GraphView extends JComponent {
             if ("Cafeteria".equals(n)) { x = 0.70; y = 0.46; }
             if ("Ground".equals(n))    { x = 0.30; y = 0.56; }
             if ("Lab".equals(n))       { x = 0.62; y = 0.62; }
+            if ("Gym".equals(n))       { x = 0.52; y = 0.72; }
+            if ("Dorms".equals(n))     { x = 0.66; y = 0.80; }
             if ("Hostel".equals(n))    { x = 0.78; y = 0.86; }
             double px = 24 + x * (w - 48);
             double py = 22 + y * (h - 44);
@@ -483,6 +516,21 @@ public class GraphView extends JComponent {
         g2.setStroke(new BasicStroke(stroke, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         g2.setColor(new Color(255, 255, 255, alpha));
         g2.draw(new Line2D.Double(pa[0], pa[1], pb[0], pb[1]));
+    }
+
+    private void triggerImpact(String node) {
+        if (node == null) return;
+        impact.put(node, 1f);
+    }
+
+    private void decayImpacts(float dtSec) {
+        if (impact.isEmpty()) return;
+        for (String k : new ArrayList<>(impact.keySet())) {
+            float v = impact.getOrDefault(k, 0f);
+            v -= dtSec * 2.4f;
+            if (v <= 0f) impact.remove(k);
+            else impact.put(k, v);
+        }
     }
 
     private double[] avatarPos(Map<String, double[]> pos) {

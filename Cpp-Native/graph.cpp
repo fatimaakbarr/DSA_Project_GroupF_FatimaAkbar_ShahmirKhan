@@ -25,21 +25,12 @@ bool CampusGraph::addLocation(const std::string& name) {
   if (indexOf_.get(name, existing)) return false;
   int idx = static_cast<int>(nameOf_.size());
   nameOf_.push_back(name);
-  adjBfs_.emplace_back();
   adjW_.emplace_back();
   indexOf_.put(name, idx);
   return true;
 }
 
-bool CampusGraph::addEdgeBfs(const std::string& a, const std::string& b) {
-  int ia, ib;
-  if (!resolve(a, ia) || !resolve(b, ib)) return false;
-  adjBfs_[ia].pushBack(EdgeU{ib});
-  adjBfs_[ib].pushBack(EdgeU{ia});
-  return true;
-}
-
-bool CampusGraph::addEdgeDijkstra(const std::string& a, const std::string& b, int w) {
+bool CampusGraph::addEdge(const std::string& a, const std::string& b, int w) {
   if (w <= 0) return false;
   int ia, ib;
   if (!resolve(a, ia) || !resolve(b, ib)) return false;
@@ -48,37 +39,23 @@ bool CampusGraph::addEdgeDijkstra(const std::string& a, const std::string& b, in
   return true;
 }
 
-bool CampusGraph::addEdge(const std::string& a, const std::string& b, int w) {
-  // Convenience: add to both graphs with same weight.
-  bool ok1 = addEdgeBfs(a, b);
-  bool ok2 = addEdgeDijkstra(a, b, w);
-  return ok1 && ok2;
-}
-
 void CampusGraph::seedDefault() {
   nameOf_.clear();
-  adjBfs_.clear();
   adjW_.clear();
   indexOf_ = dsa::HashMap<int>();
 
   // Default campus map (can be extended from GUI later)
   const char* nodes[] = {
-      "Gate", "Admin", "Library", "Cafeteria", "Block-A", "Block-B", "Lab", "Ground", "Hostel"};
+      "Gate", "Admin", "Library", "Ground", "Cafeteria",
+      "Block-A", "Block-B", "Lab", "Gym", "Dorms", "Hostel"};
   for (auto n : nodes) addLocation(n);
 
   // ==========================================================
-  // NON-NEGOTIABLE DEMO CASE (must differ):
+  // NON-NEGOTIABLE DEMO CASE (must differ) on the SAME graph:
   //
   // Locations: Gate, Admin, Library, Ground, Cafeteria
   //
-  // BFS graph (unweighted edges):
-  //   Gate-Admin
-  //   Admin-Library
-  //   Gate-Ground
-  //   Ground-Cafeteria
-  //   Cafeteria-Library
-  //
-  // Dijkstra graph (weights):
+  // Edges (weights):
   //   Gate-Admin=12, Admin-Library=12  (total 24, fewer hops)
   //   Gate-Ground=3, Ground-Cafeteria=3, Cafeteria-Library=3 (total 9, more hops)
   //
@@ -86,25 +63,46 @@ void CampusGraph::seedDefault() {
   //   BFS:      Gate -> Admin -> Library
   //   Dijkstra: Gate -> Ground -> Cafeteria -> Library
   // ==========================================================
-  addEdgeBfs("Gate", "Admin");
-  addEdgeBfs("Admin", "Library");
-  addEdgeBfs("Gate", "Ground");
-  addEdgeBfs("Ground", "Cafeteria");
-  addEdgeBfs("Cafeteria", "Library");
+  addEdge("Gate", "Admin", 12);
+  addEdge("Admin", "Library", 12);
+  addEdge("Gate", "Ground", 3);
+  addEdge("Ground", "Cafeteria", 3);
+  addEdge("Cafeteria", "Library", 3);
 
-  addEdgeDijkstra("Gate", "Admin", 12);
-  addEdgeDijkstra("Admin", "Library", 12);
-  addEdgeDijkstra("Gate", "Ground", 3);
-  addEdgeDijkstra("Ground", "Cafeteria", 3);
-  addEdgeDijkstra("Cafeteria", "Library", 3);
+  // Main roads (low weight, longer hop chains)
+  addEdge("Ground", "Admin", 2);
+  addEdge("Admin", "Block-A", 2);
+  addEdge("Admin", "Block-B", 2);
+  addEdge("Block-A", "Lab", 2);
+  addEdge("Block-B", "Lab", 2);
+  addEdge("Lab", "Gym", 2);
+  addEdge("Gym", "Dorms", 2);
+  addEdge("Dorms", "Hostel", 2);
+  addEdge("Ground", "Hostel", 3);
 
-  // Extra campus edges (kept realistic, but DO NOT create a shorter-hop alternative Gate->Library)
-  addEdge("Admin", "Block-A", 6);
-  addEdge("Admin", "Block-B", 8);
-  addEdge("Block-A", "Lab", 5);
-  addEdge("Block-B", "Lab", 4);
-  addEdge("Lab", "Hostel", 9);
-  addEdge("Ground", "Hostel", 7);
+  // Global design rule:
+  // - Main roads are cheap but usually require more hops.
+  // - Shortcuts are expensive but reduce hops.
+  // This makes BFS (min hops) and Dijkstra (min cost) differ for MOST pairs.
+
+  // Add expensive shortcuts between most pairs (but keep Gate restricted so the required test case stays stable).
+  int gateIdx = -1, adminIdx = -1, groundIdx = -1;
+  (void)resolve("Gate", gateIdx);
+  (void)resolve("Admin", adminIdx);
+  (void)resolve("Ground", groundIdx);
+
+  for (int i = 0; i < (int)nameOf_.size(); i++) {
+    for (int j = i + 1; j < (int)nameOf_.size(); j++) {
+      // Skip if an edge already exists.
+      if (edgeWeight(i, j) >= 0) continue;
+
+      // Keep Gate from having direct shortcuts (except required Gate-Admin and Gate-Ground already added).
+      if (i == gateIdx || j == gateIdx) continue;
+
+      // Add expensive shortcut.
+      addEdge(nameOf_[(size_t)i], nameOf_[(size_t)j], 50);
+    }
+  }
 }
 
 std::vector<std::string> CampusGraph::locations() const {
@@ -134,8 +132,8 @@ PathResult CampusGraph::bfsShortestPath(const std::string& src, const std::strin
     int u = q.pop();
     res.visitedOrder.push_back(nameOf_[u]);
     if (u == t) break;
-    for (auto it = adjBfs_[u].begin(); it != adjBfs_[u].end(); ++it) {
-      const EdgeU& e = *it;
+    for (auto it = adjW_[u].begin(); it != adjW_[u].end(); ++it) {
+      const EdgeW& e = *it;
       if (!vis[e.to]) {
         vis[e.to] = true;
         prev[e.to] = u;
@@ -229,4 +227,33 @@ PathResult CampusGraph::dijkstraShortestPath(const std::string& src, const std::
   res.distance = res.cost; // compatibility
   res.hops = (int)res.path.size() > 0 ? (int)res.path.size() - 1 : -1;
   return res;
+}
+
+void CampusGraph::divergenceStats(int& totalPairs, int& divergedPairs, int& percent) const {
+  totalPairs = 0;
+  divergedPairs = 0;
+  percent = 0;
+  int n = (int)nameOf_.size();
+  if (n <= 1) return;
+
+  // unordered pairs
+  for (int i = 0; i < n; i++) {
+    for (int j = i + 1; j < n; j++) {
+      totalPairs++;
+      const std::string& a = nameOf_[(size_t)i];
+      const std::string& b = nameOf_[(size_t)j];
+
+      // Use const_cast to call existing methods without changing signatures.
+      CampusGraph* self = const_cast<CampusGraph*>(this);
+      PathResult bfs = self->bfsShortestPath(a, b);
+      PathResult dij = self->dijkstraShortestPath(a, b);
+      if (bfs.path.empty() || dij.path.empty()) continue;
+
+      bool differentPath = bfs.path != dij.path;
+      bool bfsFewerHops = bfs.hops >= 0 && dij.hops >= 0 && bfs.hops < dij.hops;
+      bool bfsHigherCost = bfs.cost >= 0 && dij.cost >= 0 && bfs.cost > dij.cost;
+      if (differentPath && bfsFewerHops && bfsHigherCost) divergedPairs++;
+    }
+  }
+  percent = (totalPairs > 0) ? (divergedPairs * 100) / totalPairs : 0;
 }

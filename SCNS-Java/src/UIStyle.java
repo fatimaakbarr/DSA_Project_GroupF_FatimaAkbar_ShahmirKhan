@@ -7,6 +7,7 @@ import javax.swing.JLabel;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JList;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.ListCellRenderer;
 import javax.swing.SwingConstants;
@@ -125,6 +126,22 @@ public final class UIStyle {
                 }
             };
             t.getTableHeader().setDefaultRenderer(hdr);
+        }
+    }
+
+    public static void scrollPane(JScrollPane sp) {
+        if (sp == null) return;
+        sp.setOpaque(false);
+        sp.getViewport().setOpaque(false);
+        sp.setBorder(BorderFactory.createEmptyBorder());
+        try {
+            sp.getVerticalScrollBar().setUI(new DarkScrollBarUI());
+            sp.getHorizontalScrollBar().setUI(new DarkScrollBarUI());
+            sp.getVerticalScrollBar().setOpaque(false);
+            sp.getHorizontalScrollBar().setOpaque(false);
+            sp.getVerticalScrollBar().setUnitIncrement(18);
+            sp.getHorizontalScrollBar().setUnitIncrement(18);
+        } catch (Throwable ignored) {
         }
     }
 }

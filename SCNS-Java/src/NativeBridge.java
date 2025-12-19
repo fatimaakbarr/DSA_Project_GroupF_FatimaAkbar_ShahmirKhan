@@ -43,6 +43,7 @@ public class NativeBridge {
     // Navigator (Graph + BFS/Dijkstra)
     public native String[] navLocations();
     public native String navShortestPath(String src, String dest, String algorithm);
+    public native String navDivergenceReport();
 
     // Student Information System (AVL + searching/sorting)
     public native String sisUpsertStudent(int roll, String name, String program, int year);
