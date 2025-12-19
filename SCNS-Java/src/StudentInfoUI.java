@@ -13,6 +13,7 @@ import javax.swing.BorderFactory;
 import javax.swing.JComponent;
 import javax.swing.JLayeredPane;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
@@ -223,6 +224,30 @@ public class StudentInfoUI extends JPanel {
         if (y < 1 || y > 8) { Toast.show(layers, "Year/Semester must be between 1 and 8.", Theme.DANGER); return; }
         if (n.length() > 50) { Toast.show(layers, "Name is too long (max 50 chars).", Theme.DANGER); return; }
         if (p.length() > 20) { Toast.show(layers, "Program is too long (max 20 chars).", Theme.DANGER); return; }
+<<<<<<< HEAD
+=======
+
+        // Safety: confirm overwrite if roll already exists
+        String existingJson = nb.sisGetStudent(r);
+        boolean exists = existingJson != null && !existingJson.trim().isEmpty();
+        if (exists) {
+            Map<String, String> ex = JsonMini.obj(existingJson);
+            String oldName = JsonMini.asString(ex.get("name"));
+            String oldProg = JsonMini.asString(ex.get("program"));
+            int oldYear = JsonMini.asInt(ex.get("year"), -1);
+
+            String msg = "Roll " + r + " already exists.\n\n"
+                    + "Current: " + oldName + " | " + oldProg + " | Year " + oldYear + "\n"
+                    + "New:      " + n + " | " + p + " | Year " + y + "\n\n"
+                    + "Do you want to overwrite this record?";
+
+            int choice = JOptionPane.showConfirmDialog(this, msg, "Confirm overwrite", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+            if (choice != JOptionPane.YES_OPTION) {
+                Toast.show(layers, "Update cancelled. No changes made.", Theme.MUTED);
+                return;
+            }
+        }
+>>>>>>> origin/cursor/smart-campus-project-setup-9083
 
         String res = nb.sisUpsertStudent(r, n, p, y);
         Map<String, String> o = JsonMini.obj(res);
