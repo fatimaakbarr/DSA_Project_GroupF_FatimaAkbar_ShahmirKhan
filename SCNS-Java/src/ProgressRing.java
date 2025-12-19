@@ -34,14 +34,15 @@ public class ProgressRing extends JComponent {
         int w = getWidth();
         int h = getHeight();
 
-        g2.setColor(Theme.CARD);
-        g2.fillRoundRect(0, 0, w, h, 22, 22);
-
-        int size = Math.min(w, h) - 40;
+        // Let the parent CardPanel paint the background; only draw the ring + text here.
+        int min = Math.min(w, h);
+        int pad = Math.max(12, Math.min(22, min / 8));
+        int size = Math.max(40, min - pad * 2);
         int x = (w - size) / 2;
         int y = (h - size) / 2;
 
-        g2.setStroke(new BasicStroke(10f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        float stroke = Math.max(6f, size * 0.085f);
+        g2.setStroke(new BasicStroke(stroke, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         g2.setColor(new Color(100, 110, 140, 60));
         g2.draw(new Arc2D.Double(x, y, size, size, 90, -360, Arc2D.OPEN));
 

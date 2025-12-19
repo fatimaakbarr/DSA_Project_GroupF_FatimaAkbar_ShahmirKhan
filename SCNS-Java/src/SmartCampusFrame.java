@@ -35,14 +35,26 @@ public class SmartCampusFrame extends JFrame {
     private void openScreen(String key) {
         if (key == null) return;
         if ("home".equals(key)) {
-            if (sidebarWrapper != null) sidebarWrapper.setExpanded(false, true);
             if (sidebarNav != null) sidebarNav.selectKey("home");
+            // Switch first (stable size), then collapse sidebar AFTER transition to avoid glitches.
             switcher.switchTo("home");
+            if (sidebarWrapper != null) {
+                javax.swing.Timer t = new javax.swing.Timer(320, e -> {
+                    ((javax.swing.Timer) e.getSource()).stop();
+                    sidebarWrapper.setExpanded(false, true, null);
+                });
+                t.setRepeats(false);
+                t.start();
+            }
             return;
         }
-        if (sidebarWrapper != null) sidebarWrapper.setExpanded(true, true);
         if (sidebarNav != null) sidebarNav.selectKey(key);
-        switcher.switchTo(key);
+        // Expand sidebar FIRST (resize), then switch screen (stable during snapshot transition).
+        if (sidebarWrapper != null && sidebarWrapper.isCollapsed()) {
+            sidebarWrapper.setExpanded(true, true, () -> switcher.switchTo(key));
+        } else {
+            switcher.switchTo(key);
+        }
     }
 
     public SmartCampusFrame(NativeBridge nb) {
@@ -100,7 +112,7 @@ public class SmartCampusFrame extends JFrame {
 
             JPanel sidebar = buildSidebar();
             sidebarWrapper = new SidebarWrapper(sidebar);
-            sidebarWrapper.setExpanded(false, false); // hidden on home until a card is clicked
+            sidebarWrapper.setExpanded(false, false, null); // hidden on home until a card is clicked
 
             add(sidebarWrapper, BorderLayout.WEST);
             add(switcher, BorderLayout.CENTER);
@@ -192,13 +204,16 @@ public class SmartCampusFrame extends JFrame {
             add(inner, BorderLayout.CENTER);
         }
 
-        void setExpanded(boolean expanded, boolean animate) {
+        boolean isCollapsed() { return w < 2f; }
+
+        void setExpanded(boolean expanded, boolean animate, Runnable done) {
             target = expanded ? 260f : 0f;
             if (!animate) {
                 w = target;
                 inner.setVisible(w > 1f);
                 revalidate();
                 repaint();
+                if (done != null) done.run();
                 return;
             }
             float start = w;
@@ -214,6 +229,7 @@ public class SmartCampusFrame extends JFrame {
                 inner.setVisible(w > 1f);
                 revalidate();
                 repaint();
+                if (done != null) done.run();
             });
         }
 
