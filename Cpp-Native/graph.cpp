@@ -12,9 +12,9 @@ bool CampusGraph::resolve(const std::string& name, int& idx) const {
 
 int CampusGraph::edgeWeight(int fromIdx, int toIdx) const {
   if (fromIdx < 0 || toIdx < 0) return -1;
-  if (fromIdx >= (int)adj_.size() || toIdx >= (int)adj_.size()) return -1;
-  for (auto it = adj_[fromIdx].begin(); it != adj_[fromIdx].end(); ++it) {
-    const Edge& e = *it;
+  if (fromIdx >= (int)adjW_.size() || toIdx >= (int)adjW_.size()) return -1;
+  for (auto it = adjW_[fromIdx].begin(); it != adjW_[fromIdx].end(); ++it) {
+    const EdgeW& e = *it;
     if (e.to == toIdx) return e.w;
   }
   return -1;
@@ -25,23 +25,40 @@ bool CampusGraph::addLocation(const std::string& name) {
   if (indexOf_.get(name, existing)) return false;
   int idx = static_cast<int>(nameOf_.size());
   nameOf_.push_back(name);
-  adj_.emplace_back();
+  adjBfs_.emplace_back();
+  adjW_.emplace_back();
   indexOf_.put(name, idx);
   return true;
 }
 
-bool CampusGraph::addEdge(const std::string& a, const std::string& b, int w) {
+bool CampusGraph::addEdgeBfs(const std::string& a, const std::string& b) {
+  int ia, ib;
+  if (!resolve(a, ia) || !resolve(b, ib)) return false;
+  adjBfs_[ia].pushBack(EdgeU{ib});
+  adjBfs_[ib].pushBack(EdgeU{ia});
+  return true;
+}
+
+bool CampusGraph::addEdgeDijkstra(const std::string& a, const std::string& b, int w) {
   if (w <= 0) return false;
   int ia, ib;
   if (!resolve(a, ia) || !resolve(b, ib)) return false;
-  adj_[ia].pushBack(Edge{ib, w});
-  adj_[ib].pushBack(Edge{ia, w});
+  adjW_[ia].pushBack(EdgeW{ib, w});
+  adjW_[ib].pushBack(EdgeW{ia, w});
   return true;
+}
+
+bool CampusGraph::addEdge(const std::string& a, const std::string& b, int w) {
+  // Convenience: add to both graphs with same weight.
+  bool ok1 = addEdgeBfs(a, b);
+  bool ok2 = addEdgeDijkstra(a, b, w);
+  return ok1 && ok2;
 }
 
 void CampusGraph::seedDefault() {
   nameOf_.clear();
-  adj_.clear();
+  adjBfs_.clear();
+  adjW_.clear();
   indexOf_ = dsa::HashMap<int>();
 
   // Default campus map (can be extended from GUI later)
@@ -49,25 +66,45 @@ void CampusGraph::seedDefault() {
       "Gate", "Admin", "Library", "Cafeteria", "Block-A", "Block-B", "Lab", "Ground", "Hostel"};
   for (auto n : nodes) addLocation(n);
 
-  // Weights are \"walking time\" units (lower is better).
-  // Designed so BFS (fewest hops) and Dijkstra (lowest total weight) can differ.
+  // ==========================================================
+  // NON-NEGOTIABLE DEMO CASE (must differ):
   //
-  // Example from Gate -> Library:
-  // - BFS: Gate -> Library (1 hop, but heavy weight)
-  // - Dijkstra: Gate -> Ground -> Cafeteria -> Library (3 hops, but lower total)
-  addEdge("Gate", "Library", 15);      // direct but \"crowded\" path
-  addEdge("Gate", "Admin", 3);
-  addEdge("Gate", "Ground", 2);
+  // Locations: Gate, Admin, Library, Ground, Cafeteria
+  //
+  // BFS graph (unweighted edges):
+  //   Gate-Admin
+  //   Admin-Library
+  //   Gate-Ground
+  //   Ground-Cafeteria
+  //   Cafeteria-Library
+  //
+  // Dijkstra graph (weights):
+  //   Gate-Admin=12, Admin-Library=12  (total 24, fewer hops)
+  //   Gate-Ground=3, Ground-Cafeteria=3, Cafeteria-Library=3 (total 9, more hops)
+  //
+  // Expected Gate -> Library:
+  //   BFS:      Gate -> Admin -> Library
+  //   Dijkstra: Gate -> Ground -> Cafeteria -> Library
+  // ==========================================================
+  addEdgeBfs("Gate", "Admin");
+  addEdgeBfs("Admin", "Library");
+  addEdgeBfs("Gate", "Ground");
+  addEdgeBfs("Ground", "Cafeteria");
+  addEdgeBfs("Cafeteria", "Library");
 
-  addEdge("Ground", "Cafeteria", 2);
-  addEdge("Cafeteria", "Library", 2);
+  addEdgeDijkstra("Gate", "Admin", 12);
+  addEdgeDijkstra("Admin", "Library", 12);
+  addEdgeDijkstra("Gate", "Ground", 3);
+  addEdgeDijkstra("Ground", "Cafeteria", 3);
+  addEdgeDijkstra("Cafeteria", "Library", 3);
 
-  addEdge("Admin", "Block-A", 4);
-  addEdge("Admin", "Block-B", 6);
-  addEdge("Block-A", "Lab", 3);
-  addEdge("Block-B", "Lab", 2);
-  addEdge("Lab", "Hostel", 5);
-  addEdge("Ground", "Hostel", 4);
+  // Extra campus edges (kept realistic, but DO NOT create a shorter-hop alternative Gate->Library)
+  addEdge("Admin", "Block-A", 6);
+  addEdge("Admin", "Block-B", 8);
+  addEdge("Block-A", "Lab", 5);
+  addEdge("Block-B", "Lab", 4);
+  addEdge("Lab", "Hostel", 9);
+  addEdge("Ground", "Hostel", 7);
 }
 
 std::vector<std::string> CampusGraph::locations() const {
@@ -97,8 +134,8 @@ PathResult CampusGraph::bfsShortestPath(const std::string& src, const std::strin
     int u = q.pop();
     res.visitedOrder.push_back(nameOf_[u]);
     if (u == t) break;
-    for (auto it = adj_[u].begin(); it != adj_[u].end(); ++it) {
-      const Edge& e = *it;
+    for (auto it = adjBfs_[u].begin(); it != adjBfs_[u].end(); ++it) {
+      const EdgeU& e = *it;
       if (!vis[e.to]) {
         vis[e.to] = true;
         prev[e.to] = u;
@@ -166,8 +203,8 @@ PathResult CampusGraph::dijkstraShortestPath(const std::string& src, const std::
     res.visitedOrder.push_back(nameOf_[u]);
     if (u == t) break;
 
-    for (auto it = adj_[u].begin(); it != adj_[u].end(); ++it) {
-      const Edge& e = *it;
+    for (auto it = adjW_[u].begin(); it != adjW_[u].end(); ++it) {
+      const EdgeW& e = *it;
       if (dist[u] != INF && dist[u] + e.w < dist[e.to]) {
         dist[e.to] = dist[u] + e.w;
         prev[e.to] = u;

@@ -31,6 +31,20 @@ public class GraphView extends JComponent {
     private float edgeT = 0f;
     private long lastTick = 0;
 
+    // Race mode (BFS vs Dijkstra simultaneously)
+    private boolean raceMode = false;
+    private final List<String> bfsPath = new ArrayList<>();
+    private final List<String> dijPath = new ArrayList<>();
+    private final List<String> bfsVisited = new ArrayList<>();
+    private final List<String> dijVisited = new ArrayList<>();
+    private final List<Integer> bfsEdgeW = new ArrayList<>();
+    private final List<Integer> dijEdgeW = new ArrayList<>();
+    private int bfsVisIndex = 0, dijVisIndex = 0;
+    private int bfsEdgeIndex = 0, dijEdgeIndex = 0;
+    private float bfsEdgeT = 0f, dijEdgeT = 0f;
+    private float loserAlpha = 1f; // fades losing trail
+    private String winner = "Dijkstra";
+
     public GraphView() {
         setOpaque(false);
         idle = new javax.swing.Timer(16, e -> {
@@ -51,6 +65,7 @@ public class GraphView extends JComponent {
     }
 
     public void animateTraversal(List<String> path, List<String> visited, List<Integer> edgeWeights, String mode) {
+        raceMode = false;
         setMode(mode);
         this.path.clear();
         if (path != null) this.path.addAll(path);
@@ -71,6 +86,7 @@ public class GraphView extends JComponent {
     }
 
     public void animateCompare(List<String> primaryPath, List<String> secondaryPath, List<String> visited) {
+        raceMode = false;
         this.path.clear();
         if (primaryPath != null) this.path.addAll(primaryPath);
         this.path2.clear();
@@ -85,10 +101,92 @@ public class GraphView extends JComponent {
         repaint();
     }
 
+    public void animateRace(
+            List<String> bfsPath,
+            List<String> bfsVisited,
+            List<Integer> bfsEdgeWeights,
+            List<String> dijPath,
+            List<String> dijVisited,
+            List<Integer> dijEdgeWeights,
+            String winner) {
+        raceMode = true;
+        this.winner = (winner == null || winner.isEmpty()) ? "Dijkstra" : winner;
+        this.loserAlpha = 1f;
+
+        this.path.clear();
+        this.path2.clear();
+        this.visited.clear();
+        this.edgeWeights.clear();
+
+        this.bfsPath.clear();
+        if (bfsPath != null) this.bfsPath.addAll(bfsPath);
+        this.dijPath.clear();
+        if (dijPath != null) this.dijPath.addAll(dijPath);
+
+        this.bfsVisited.clear();
+        if (bfsVisited != null) this.bfsVisited.addAll(bfsVisited);
+        this.dijVisited.clear();
+        if (dijVisited != null) this.dijVisited.addAll(dijVisited);
+
+        this.bfsEdgeW.clear();
+        if (bfsEdgeWeights != null) this.bfsEdgeW.addAll(bfsEdgeWeights);
+        this.dijEdgeW.clear();
+        if (dijEdgeWeights != null) this.dijEdgeW.addAll(dijEdgeWeights);
+
+        if (routeTimer != null) routeTimer.stop();
+        bfsVisIndex = 0;
+        dijVisIndex = 0;
+        bfsEdgeIndex = 0;
+        dijEdgeIndex = 0;
+        bfsEdgeT = 0f;
+        dijEdgeT = 0f;
+        lastTick = System.currentTimeMillis();
+        routeTimer = new javax.swing.Timer(16, e -> tick());
+        routeTimer.start();
+    }
+
     private void tick() {
         long now = System.currentTimeMillis();
         long dt = Math.max(1, now - lastTick);
         lastTick = now;
+
+        if (raceMode) {
+            // visited timing
+            int bfsVisStep = Math.max(1, (int) (dt / 85));
+            int dijVisStep = Math.max(1, (int) (dt / 105));
+            bfsVisIndex = Math.min(bfsVisited.size(), bfsVisIndex + bfsVisStep);
+            dijVisIndex = Math.min(dijVisited.size(), dijVisIndex + dijVisStep);
+
+            // edge timing (BFS uniform; Dijkstra proportional to edge weights)
+            int bfsEdges = Math.max(0, bfsPath.size() - 1);
+            int dijEdges = Math.max(0, dijPath.size() - 1);
+
+            if (bfsEdges > 0 && bfsEdgeIndex < bfsEdges) {
+                int segMs = 220; // uniform
+                bfsEdgeT += (float) dt / (float) segMs;
+                if (bfsEdgeT >= 1f) { bfsEdgeIndex++; bfsEdgeT = 0f; }
+            }
+
+            if (dijEdges > 0 && dijEdgeIndex < dijEdges) {
+                int w = 1;
+                if (dijEdgeIndex < dijEdgeW.size()) w = Math.max(1, dijEdgeW.get(dijEdgeIndex));
+                int segMs = 120 + w * 45;
+                dijEdgeT += (float) dt / (float) segMs;
+                if (dijEdgeT >= 1f) { dijEdgeIndex++; dijEdgeT = 0f; }
+            }
+
+            boolean bfsDone = (bfsEdges <= 0) || (bfsEdgeIndex >= bfsEdges);
+            boolean dijDone = (dijEdges <= 0) || (dijEdgeIndex >= dijEdges);
+            if (bfsDone && dijDone) {
+                loserAlpha -= (float) dt / 900f;
+                if (loserAlpha <= 0.18f) {
+                    loserAlpha = 0.18f;
+                    routeTimer.stop();
+                }
+            }
+            repaint();
+            return;
+        }
 
         int visStepMs = "Dijkstra".equalsIgnoreCase(mode) ? 105 : 85;
         int visStep = (int) (dt / visStepMs);
@@ -130,6 +228,12 @@ public class GraphView extends JComponent {
         }
 
         Map<String, double[]> pos = layout(nodes, w, h);
+
+        if (raceMode) {
+            paintRace(g2, pos);
+            g2.dispose();
+            return;
+        }
 
         Color bfsC = new Color(60, 220, 255);
         Color dijC = new Color(180, 110, 255);
@@ -231,6 +335,119 @@ public class GraphView extends JComponent {
         }
 
         g2.dispose();
+    }
+
+    private void paintRace(Graphics2D g2, Map<String, double[]> pos) {
+        Color bfsC = new Color(60, 220, 255);
+        Color dijC = new Color(180, 110, 255);
+
+        // Base map edges (weight-based styling)
+        drawCampusEdge(g2, pos, "Gate", "Admin", 12);
+        drawCampusEdge(g2, pos, "Admin", "Library", 12);
+        drawCampusEdge(g2, pos, "Gate", "Ground", 3);
+        drawCampusEdge(g2, pos, "Ground", "Cafeteria", 3);
+        drawCampusEdge(g2, pos, "Cafeteria", "Library", 3);
+        drawCampusEdge(g2, pos, "Admin", "Block-A", 6);
+        drawCampusEdge(g2, pos, "Admin", "Block-B", 8);
+        drawCampusEdge(g2, pos, "Block-A", "Lab", 5);
+        drawCampusEdge(g2, pos, "Block-B", "Lab", 4);
+        drawCampusEdge(g2, pos, "Lab", "Hostel", 9);
+        drawCampusEdge(g2, pos, "Ground", "Hostel", 7);
+
+        boolean bfsWins = "BFS".equalsIgnoreCase(winner);
+        float bfsA = bfsWins ? 1f : loserAlpha;
+        float dijA = bfsWins ? loserAlpha : 1f;
+
+        // visited trails
+        drawVisitedTrail(g2, pos, bfsVisited, bfsVisIndex, bfsC, bfsA);
+        drawVisitedTrail(g2, pos, dijVisited, dijVisIndex, dijC, dijA);
+
+        // path paint
+        drawProgressPath(g2, pos, bfsPath, bfsEdgeIndex, bfsEdgeT, bfsC, 4.6f, bfsA, false);
+        drawProgressPath(g2, pos, dijPath, dijEdgeIndex, dijEdgeT, dijC, 2.8f, dijA, true);
+
+        // runner dots
+        double[] bp = raceAvatar(pos, bfsPath, bfsEdgeIndex, bfsEdgeT);
+        if (bp != null) drawRunner(g2, bp[0], bp[1], bfsC, bfsA);
+        double[] dp = raceAvatar(pos, dijPath, dijEdgeIndex, dijEdgeT);
+        if (dp != null) drawRunner(g2, dp[0], dp[1], dijC, dijA);
+
+        // Nodes on top
+        Font f = getFont().deriveFont(Font.BOLD, 12f);
+        g2.setFont(f);
+        for (String n : nodes) {
+            double[] p = pos.get(n);
+            if (p == null) continue;
+            boolean inB = bfsPath.contains(n);
+            boolean inD = dijPath.contains(n);
+            Color ring = inD ? new Color(dijC.getRed(), dijC.getGreen(), dijC.getBlue(), 220) : (inB ? new Color(bfsC.getRed(), bfsC.getGreen(), bfsC.getBlue(), 220) : new Color(90, 105, 140));
+            g2.setColor(new Color(12, 14, 24));
+            g2.fill(new Ellipse2D.Double(p[0] - 12, p[1] - 12, 24, 24));
+            g2.setStroke(new BasicStroke(2.2f));
+            g2.setColor(ring);
+            g2.draw(new Ellipse2D.Double(p[0] - 12, p[1] - 12, 24, 24));
+            g2.setColor(Theme.TEXT);
+            g2.drawString(n, (int) p[0] - 14, (int) p[1] - 16);
+        }
+    }
+
+    private static void drawVisitedTrail(Graphics2D g2, Map<String, double[]> pos, List<String> v, int count, Color c, float alphaMul) {
+        int visCount = Math.min(v.size(), count);
+        for (int i = 0; i < visCount; i++) {
+            String name = v.get(i);
+            double[] p = pos.get(name);
+            if (p == null) continue;
+            int age = (visCount - 1) - i;
+            int a = Math.max(10, 70 - age * 12);
+            a = (int) (a * alphaMul);
+            double rr = 15;
+            g2.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), Math.min(120, a)));
+            g2.fill(new Ellipse2D.Double(p[0] - rr, p[1] - rr, rr * 2, rr * 2));
+        }
+    }
+
+    private static void drawProgressPath(Graphics2D g2, Map<String, double[]> pos, List<String> path, int edgeIndex, float edgeT, Color c, float stroke, float alphaMul, boolean dashed) {
+        int edges = Math.max(0, path.size() - 1);
+        if (edges <= 0) return;
+        if (dashed) g2.setStroke(new BasicStroke(stroke, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10f, new float[] { 6f, 8f }, 0f));
+        else g2.setStroke(new BasicStroke(stroke, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
+        g2.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), (int) (220 * alphaMul)));
+
+        for (int i = 0; i < Math.min(edgeIndex, edges); i++) {
+            double[] a = pos.get(path.get(i));
+            double[] b = pos.get(path.get(i + 1));
+            if (a == null || b == null) continue;
+            g2.draw(new Line2D.Double(a[0], a[1], b[0], b[1]));
+        }
+        if (edgeIndex < edges) {
+            double[] a = pos.get(path.get(edgeIndex));
+            double[] b = pos.get(path.get(edgeIndex + 1));
+            if (a != null && b != null) {
+                double x = a[0] + (b[0] - a[0]) * Math.max(0, Math.min(1, edgeT));
+                double y = a[1] + (b[1] - a[1]) * Math.max(0, Math.min(1, edgeT));
+                g2.draw(new Line2D.Double(a[0], a[1], x, y));
+            }
+        }
+    }
+
+    private static void drawRunner(Graphics2D g2, double x, double y, Color c, float aMul) {
+        double glow = 9;
+        g2.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), (int) (120 * aMul)));
+        g2.fill(new Ellipse2D.Double(x - glow, y - glow, glow * 2, glow * 2));
+        g2.setColor(new Color(255, 255, 255, (int) (230 * aMul)));
+        g2.fill(new Ellipse2D.Double(x - 3.5, y - 3.5, 7, 7));
+    }
+
+    private static double[] raceAvatar(Map<String, double[]> pos, List<String> path, int edgeIndex, float edgeT) {
+        if (path.size() < 2) return null;
+        int edges = path.size() - 1;
+        if (edges <= 0) return null;
+        int seg = Math.max(0, Math.min(edges - 1, edgeIndex));
+        double local = edgeIndex >= edges ? 1.0 : Math.max(0.0, Math.min(1.0, edgeT));
+        double[] a = pos.get(path.get(seg));
+        double[] b = pos.get(path.get(seg + 1));
+        if (a == null || b == null) return null;
+        return new double[] { a[0] + (b[0] - a[0]) * local, a[1] + (b[1] - a[1]) * local };
     }
 
     private static Map<String, double[]> layout(String[] nodes, int w, int h) {

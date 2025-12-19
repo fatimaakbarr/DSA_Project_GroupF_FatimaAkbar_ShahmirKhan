@@ -252,26 +252,27 @@ public class NavigatorUI extends JPanel {
 
         java.util.List<String> bfsPath = JsonMini.arrStrings(bfs.get("path"));
         java.util.List<String> dijPath = JsonMini.arrStrings(dij.get("path"));
-        java.util.List<String> visited = JsonMini.arrStrings(dij.get("visited")); // dijkstra visited looks nicer for demo
+        java.util.List<String> bfsVisited = JsonMini.arrStrings(bfs.get("visited"));
+        java.util.List<String> dijVisited = JsonMini.arrStrings(dij.get("visited"));
+        java.util.List<Integer> bfsEdgeW = JsonMini.arrInts(bfs.get("edgeWeights"));
+        java.util.List<Integer> dijEdgeW = JsonMini.arrInts(dij.get("edgeWeights"));
 
-        out.setText("Compare: BFS(hops " + bfsHops + ", cost " + bfsCost + ") vs Dijkstra(cost " + dijCost + ", hops " + dijHops + ")");
-        boolean costWinnerDij = (dijCost >= 0 && bfsCost >= 0 && dijCost <= bfsCost);
-        boolean hopWinnerBfs = (bfsHops >= 0 && dijHops >= 0 && bfsHops <= dijHops);
-        compare.setText("Purple=primary (toggle) • Cyan dashed=other • Use chips to explain the difference");
+        out.setText("Algorithm Race: BFS vs Dijkstra");
+        boolean costWinnerDij = (dijCost >= 0 && bfsCost >= 0 && dijCost < bfsCost);
+        boolean hopWinnerBfs = (bfsHops >= 0 && dijHops >= 0 && bfsHops < dijHops);
+        String winner = costWinnerDij ? "Dijkstra" : "BFS";
+        compare.setText("Winner: " + winner + "  •  (Cost decides the winner; BFS can still win on hops)");
 
         String chip1 = costWinnerDij ? "Best cost: Dijkstra" : "Best cost: BFS path";
         String chip2 = hopWinnerBfs ? "Fewest hops: BFS" : "Fewest hops: Dijkstra";
-        int bfsVisited = JsonMini.arrStrings(bfs.get("visited")).size();
-        int dijVisited = JsonMini.arrStrings(dij.get("visited")).size();
-        String chip3 = "Visited nodes: BFS " + bfsVisited + " • Dij " + dijVisited;
+        String chip3 = "Visited: BFS " + bfsVisited.size() + " • Dij " + dijVisited.size();
         chips.setChips(new String[] { chip1, chip2, chip3 }, new java.awt.Color[] { Theme.ACCENT, Theme.ACCENT_2, Theme.CARD_2 });
 
-        // Primary = currently selected algorithm, secondary = other
-        boolean primaryIsBfs = "BFS".equals(algorithm);
-        java.util.List<String> primary = primaryIsBfs ? bfsPath : dijPath;
-        java.util.List<String> secondary = primaryIsBfs ? dijPath : bfsPath;
-        graph.setMode("Dijkstra");
-        graph.animateCompare(primary, secondary, visited);
+        explain.setText("<html><b>Why do they differ?</b><br/>"
+                + "BFS chooses the route with <b>fewest stops</b> (hops = " + bfsHops + ").<br/>"
+                + "Dijkstra chooses the route with <b>lowest total cost</b> (cost = " + dijCost + ").</html>");
+
+        graph.animateRace(bfsPath, bfsVisited, bfsEdgeW, dijPath, dijVisited, dijEdgeW, winner);
     }
 
     // Premium chips row

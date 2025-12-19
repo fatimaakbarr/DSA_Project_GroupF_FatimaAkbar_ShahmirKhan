@@ -58,12 +58,24 @@ public class NativeBridge {
     public native String attGetDefaulters(int minPercent);
 
     public NativeBridge() {
-        // default data location relative to repo root
+        // Default data file (try to locate repo-root /data/students.csv)
         String path = "data/students.csv";
         try {
-            java.io.File f = new java.io.File(path);
-            java.io.File parent = f.getParentFile();
-            if (parent != null) parent.mkdirs();
+            java.io.File dir = new java.io.File(System.getProperty("user.dir"));
+            java.io.File found = null;
+            for (int i = 0; i < 6 && dir != null; i++) {
+                java.io.File candidate = new java.io.File(new java.io.File(dir, "data"), "students.csv");
+                if (candidate.exists()) { found = candidate; break; }
+                dir = dir.getParentFile();
+            }
+            if (found != null) {
+                path = found.getAbsolutePath();
+            } else {
+                java.io.File f = new java.io.File(path);
+                java.io.File parent = f.getParentFile();
+                if (parent != null) parent.mkdirs();
+                path = f.getAbsolutePath();
+            }
         } catch (Throwable ignored) {}
         init(path);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {

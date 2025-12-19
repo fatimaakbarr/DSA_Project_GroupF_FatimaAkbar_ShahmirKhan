@@ -4,6 +4,8 @@ public class MainMenu {
         if (java.awt.GraphicsEnvironment.isHeadless()) {
             NativeBridge nb = new NativeBridge();
             System.out.println(nb.testConnection());
+            System.out.println("BFS Gate->Library: " + nb.navShortestPath("Gate", "Library", "BFS"));
+            System.out.println("Dij Gate->Library: " + nb.navShortestPath("Gate", "Library", "Dijkstra"));
             System.out.println(nb.navShortestPath("Gate", "Hostel", "Dijkstra"));
             System.out.println(nb.sisListStudents());
             System.out.println(nb.attGetDefaulters(75));
