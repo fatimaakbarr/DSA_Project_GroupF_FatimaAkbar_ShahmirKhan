@@ -48,6 +48,7 @@ public class NativeBridge {
     // Student Information System (AVL + searching/sorting)
     public native String sisUpsertStudent(int roll, String name, String program, int year);
     public native String sisGetStudent(int roll);
+    public native String sisGetStudentTrace(int roll);
     public native String sisDeleteStudent(int roll);
     public native String sisListStudents();
     public native String sisImportCsv(String csvPath);

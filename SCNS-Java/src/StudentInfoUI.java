@@ -265,7 +265,8 @@ public class StudentInfoUI extends JPanel {
         if (f == null) return;
         Map<String, String> o = JsonMini.obj(nb.sisImportCsv(f.getAbsolutePath()));
         Toast.show(layers, JsonMini.asString(o.getOrDefault("message", "OK")), JsonMini.asBool(o.get("ok")) ? Theme.OK : Theme.DANGER);
-        refresh();
+        // conveyor belt feel: reflow in
+        refresh(true);
     }
 
     private void exportCsv() {
@@ -277,13 +278,15 @@ public class StudentInfoUI extends JPanel {
         if (f == null) return;
         Map<String, String> o = JsonMini.obj(nb.sisExportCsv(f.getAbsolutePath()));
         Toast.show(layers, JsonMini.asString(o.getOrDefault("message", "OK")), JsonMini.asBool(o.get("ok")) ? Theme.OK : Theme.DANGER);
+        // tiny \"fly to folder\" pulse
+        cabinet.animateExportPulse();
     }
 
     private void search() {
         Integer r = parseIntStrict(roll.getText());
         if (r == null || r <= 0) { Toast.show(layers, "Enter a valid numeric roll to search.", Theme.DANGER); return; }
 
-        String json = nb.sisGetStudent(r);
+        String json = nb.sisGetStudentTrace(r);
         if (json == null || json.trim().isEmpty()) {
             Toast.show(layers, "Student not found.", Theme.DANGER);
             return;
@@ -293,7 +296,8 @@ public class StudentInfoUI extends JPanel {
         program.setText(JsonMini.asString(o.get("program")));
         year.setText(String.valueOf(JsonMini.asInt(o.get("year"), 1)));
         Toast.show(layers, "Record loaded.", Theme.OK);
-        cabinet.animateSearch(r);
+        java.util.List<Integer> trace = JsonMini.arrInts(o.get("visited"));
+        cabinet.animateSearchTrace(trace, r);
     }
 
     private void delete() {

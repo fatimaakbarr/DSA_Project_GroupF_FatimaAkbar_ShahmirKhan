@@ -267,6 +267,29 @@ JNIEXPORT jstring JNICALL Java_NativeBridge_sisGetStudent(JNIEnv* env, jobject o
   return env->NewStringUTF(out.c_str());
 }
 
+JNIEXPORT jstring JNICALL Java_NativeBridge_sisGetStudentTrace(JNIEnv* env, jobject obj, jint roll) {
+  Backend* bkend = getBackend(env, obj);
+  if (!bkend) return env->NewStringUTF("");
+  StudentRecord r;
+  std::vector<int> visited;
+  StoreResult sr = bkend->students.getStudentTrace((int)roll, r, visited);
+  if (!sr.ok) return env->NewStringUTF("");
+
+  std::vector<std::string> visItems;
+  visItems.reserve(visited.size());
+  for (size_t i = 0; i < visited.size(); i++) visItems.push_back(std::to_string(visited[i]));
+
+  std::vector<Kv> kv;
+  kv.push_back(Kv{"roll", std::to_string(r.roll)});
+  kv.push_back(Kv{"name", jsonutil::quote(r.name)});
+  kv.push_back(Kv{"program", jsonutil::quote(r.program)});
+  kv.push_back(Kv{"year", std::to_string(r.semester)});
+  kv.push_back(Kv{"present", std::to_string(r.present)});
+  kv.push_back(Kv{"total", std::to_string(r.total)});
+  kv.push_back(Kv{"visited", jsonutil::arr(visItems)});
+  return env->NewStringUTF(jsonutil::obj(kv).c_str());
+}
+
 JNIEXPORT jstring JNICALL Java_NativeBridge_sisDeleteStudent(JNIEnv* env, jobject obj, jint roll) {
   Backend* bkend = getBackend(env, obj);
   if (!bkend) {

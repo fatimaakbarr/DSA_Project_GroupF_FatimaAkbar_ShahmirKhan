@@ -29,6 +29,7 @@ class StudentStore {
   StoreResult addStudent(const StudentRecord& r);       // insert only, no overwrite
   StoreResult deleteStudent(int roll);                 // remove + safe rewrite
   StoreResult getStudent(int roll, StudentRecord& out) const;
+  StoreResult getStudentTrace(int roll, StudentRecord& out, std::vector<int>& visited) const;
 
   StoreResult newDayForAll();                          // total++ for all
   StoreResult markPresent(int roll);                   // present++ for roll

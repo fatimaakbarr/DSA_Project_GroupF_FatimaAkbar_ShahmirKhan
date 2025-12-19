@@ -26,6 +26,7 @@ public class AttendanceUI extends JPanel {
     private final JTextField threshold = field("Defaulter threshold % (e.g. 75)");
 
     private final ProgressRing ring = new ProgressRing();
+    private final HeapView heapView = new HeapView();
 
     private final DefaultTableModel model = new DefaultTableModel(new Object[] { "Roll", "Name", "Present", "Total", "%" }, 0) {
         @Override
@@ -159,6 +160,15 @@ public class AttendanceUI extends JPanel {
         ringCard.add(rl, BorderLayout.NORTH);
         ringCard.add(ring, BorderLayout.CENTER);
 
+        JPanel heapCard = new CardPanel();
+        heapCard.setLayout(new BorderLayout());
+        JLabel hl = new JLabel("Min-Heap Priority (lowest % first)");
+        hl.setBorder(BorderFactory.createEmptyBorder(10, 12, 8, 12));
+        hl.setForeground(Theme.TEXT);
+        hl.setFont(hl.getFont().deriveFont(Font.BOLD, 13f));
+        heapCard.add(hl, BorderLayout.NORTH);
+        heapCard.add(heapView, BorderLayout.CENTER);
+
         JScrollPane sp = new JScrollPane(table);
         UIStyle.scrollPane(sp);
         sp.getViewport().setBackground(Theme.CARD);
@@ -176,6 +186,7 @@ public class AttendanceUI extends JPanel {
 
         p.add(controls);
         p.add(ringCard);
+        p.add(heapCard);
         p.add(listCard);
 
         p.addComponentListener(new java.awt.event.ComponentAdapter() {
@@ -188,7 +199,10 @@ public class AttendanceUI extends JPanel {
                 int controlsH = 360;
                 int gap = 14;
                 controls.setBounds(0, 0, leftW, controlsH);
-                ringCard.setBounds(0, controlsH + gap, leftW, h - (controlsH + gap));
+                int rest = h - (controlsH + gap);
+                int ringH = (int) (rest * 0.56);
+                ringCard.setBounds(0, controlsH + gap, leftW, ringH);
+                heapCard.setBounds(0, controlsH + gap + ringH + gap, leftW, rest - ringH - gap);
 
                 listCard.setBounds(leftW + 16, 0, w - leftW - 16, h);
             }
@@ -210,6 +224,7 @@ public class AttendanceUI extends JPanel {
         Map<String, String> o = JsonMini.obj(nb.attMarkPresent(r));
         Toast.show(layers, JsonMini.asString(o.getOrDefault("message", "OK")), JsonMini.asBool(o.get("ok")) ? Theme.OK : Theme.DANGER);
         showSummary();
+        showDefaulters();
     }
 
     private void showSummary() {
@@ -233,6 +248,7 @@ public class AttendanceUI extends JPanel {
 
         model.setRowCount(0);
         List<Map<String, String>> arr = JsonMini.arrObjects(nb.attGetDefaulters(min));
+        java.util.List<HeapView.Item> heap = new java.util.ArrayList<>();
         for (Map<String, String> o : arr) {
             model.addRow(new Object[] {
                     JsonMini.asInt(o.get("roll"), 0),
@@ -241,7 +257,13 @@ public class AttendanceUI extends JPanel {
                     JsonMini.asInt(o.get("total"), 0),
                     JsonMini.asInt(o.get("percent"), 0)
             });
+            HeapView.Item it = new HeapView.Item();
+            it.roll = JsonMini.asInt(o.get("roll"), 0);
+            it.name = JsonMini.asString(o.get("name"));
+            it.percent = JsonMini.asInt(o.get("percent"), 0);
+            heap.add(it);
         }
+        heapView.setItems(heap, true);
         Toast.show(layers, "Loaded " + arr.size() + " defaulters below " + min + "%.", Theme.OK);
     }
 

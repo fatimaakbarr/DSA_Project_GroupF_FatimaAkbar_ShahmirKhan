@@ -193,6 +193,12 @@ StoreResult StudentStore::getStudent(int roll, StudentRecord& out) const {
   return StoreResult{true, "OK"};
 }
 
+StoreResult StudentStore::getStudentTrace(int roll, StudentRecord& out, std::vector<int>& visited) const {
+  if (roll <= 0) return StoreResult{false, "Invalid roll."};
+  if (!db_.findTrace(roll, out, visited)) return StoreResult{false, "Not found."};
+  return StoreResult{true, "OK"};
+}
+
 StoreResult StudentStore::newDayForAll() {
   std::vector<StudentRecord> all = db_.inorder();
   if (all.empty()) return StoreResult{false, "No students registered."};

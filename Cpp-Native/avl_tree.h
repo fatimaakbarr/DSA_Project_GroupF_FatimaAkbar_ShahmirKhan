@@ -26,6 +26,8 @@ class AvlStudentDB {
   bool update(const StudentRecord& r);
   bool remove(int roll);
   bool find(int roll, StudentRecord& out) const;
+  // Like find(), but also returns the visited node keys (for UI search animation).
+  bool findTrace(int roll, StudentRecord& out, std::vector<int>& visited) const;
   std::vector<StudentRecord> inorder() const;
 
   int size() const { return size_; }

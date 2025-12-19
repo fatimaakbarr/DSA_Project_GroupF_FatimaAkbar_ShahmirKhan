@@ -28,6 +28,7 @@ public class FolderCabinetView extends JComponent {
 
     private int highlightRoll = -1;
     private float zoom = 1f;
+    private float exportPulse = 0f;
 
     public FolderCabinetView() {
         setOpaque(false);
@@ -115,11 +116,53 @@ public class FolderCabinetView extends JComponent {
         }, null);
     }
 
+    public void animateSearchTrace(List<Integer> visitedRolls, int targetRoll) {
+        if (visitedRolls == null || visitedRolls.isEmpty()) {
+            animateSearch(targetRoll);
+            return;
+        }
+        clearSearch();
+        zoom = 1f;
+        Anim.run(200, 60, t -> { zoom = 1f + 0.025f * (float) Anim.easeOutCubic(t); repaint(); }, null);
+
+        final int[] i = {0};
+        javax.swing.Timer step = new javax.swing.Timer(120, null);
+        step.addActionListener(e -> {
+            int idx = i[0]++;
+            if (idx >= visitedRolls.size()) {
+                ((javax.swing.Timer) e.getSource()).stop();
+                highlightRoll = targetRoll;
+                // dim non-matching
+                for (int k = 0; k < records.size(); k++) alpha.set(k, records.get(k).roll == targetRoll ? 1f : 0.22f);
+                Anim.run(260, 60, tt -> { zoom = 1.025f - 0.025f * (float) Anim.easeInOutCubic(tt); repaint(); }, null);
+                return;
+            }
+            highlightRoll = visitedRolls.get(idx);
+            // subtle riffle: briefly dim all, then restore
+            for (int k = 0; k < alpha.size(); k++) alpha.set(k, 0.55f);
+            repaint();
+            new javax.swing.Timer(70, ev -> {
+                ((javax.swing.Timer) ev.getSource()).stop();
+                for (int k = 0; k < alpha.size(); k++) alpha.set(k, 1f);
+                repaint();
+            }).start();
+        });
+        step.start();
+    }
+
     public void clearSearch() {
         highlightRoll = -1;
         for (int i = 0; i < alpha.size(); i++) alpha.set(i, 1f);
         zoom = 1f;
         repaint();
+    }
+
+    public void animateExportPulse() {
+        exportPulse = 1f;
+        Anim.run(420, 60, t -> {
+            exportPulse = 1f - (float) Anim.easeOutCubic(t);
+            repaint();
+        }, () -> { exportPulse = 0f; repaint(); });
     }
 
     public void animateDelete(int roll) {
@@ -173,6 +216,18 @@ public class FolderCabinetView extends JComponent {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
         int w = getWidth();
+
+        // export folder icon (top-right)
+        if (exportPulse > 0f) {
+            int fx = w - 70;
+            int fy = 10;
+            int fa = (int) (160 * exportPulse);
+            g2.setColor(new Color(Theme.ACCENT_2.getRed(), Theme.ACCENT_2.getGreen(), Theme.ACCENT_2.getBlue(), fa));
+            g2.fillRoundRect(fx, fy + 8, 52, 34, 10, 10);
+            g2.fillRoundRect(fx + 10, fy, 22, 16, 10, 10);
+            g2.setColor(new Color(255, 255, 255, (int) (70 * exportPulse)));
+            g2.drawRoundRect(fx, fy + 8, 52, 34, 10, 10);
+        }
 
         // subtle cabinet rail
         g2.setColor(new Color(255, 255, 255, 10));

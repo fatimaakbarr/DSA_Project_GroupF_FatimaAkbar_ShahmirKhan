@@ -151,6 +151,21 @@ bool AvlStudentDB::find(int roll, StudentRecord& out) const {
   return false;
 }
 
+bool AvlStudentDB::findTrace(int roll, StudentRecord& out, std::vector<int>& visited) const {
+  visited.clear();
+  Node* cur = root_;
+  while (cur) {
+    visited.push_back(cur->rec.roll);
+    if (roll < cur->rec.roll) cur = cur->left;
+    else if (roll > cur->rec.roll) cur = cur->right;
+    else {
+      out = cur->rec;
+      return true;
+    }
+  }
+  return false;
+}
+
 std::vector<StudentRecord> AvlStudentDB::inorder() const {
   std::vector<StudentRecord> out;
   inorderCollect(root_, out);

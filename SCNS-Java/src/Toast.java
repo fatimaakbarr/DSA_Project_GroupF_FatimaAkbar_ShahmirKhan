@@ -21,8 +21,9 @@ public final class Toast {
         layers.add(view, Integer.valueOf(JLayeredPane.POPUP_LAYER));
         layers.repaint();
 
-        Anim.run(220, 60, t -> {
-            view.alpha = (float) Anim.easeOutCubic(t);
+        Anim.run(260, 60, t -> {
+            view.alpha = (float) Anim.easeOutBack(t);
+            view.slide = (float) (1.0 - Anim.easeOutCubic(t));
             view.repaint();
         }, () -> {
             Anim.run(2200, 60, t -> {
@@ -30,6 +31,7 @@ public final class Toast {
             }, () -> {
                 Anim.run(260, 60, t -> {
                     view.alpha = 1f - (float) Anim.easeOutCubic(t);
+                    view.slide = (float) Anim.easeOutCubic(t);
                     view.repaint();
                 }, () -> {
                     layers.remove(view);
@@ -43,6 +45,7 @@ public final class Toast {
         private final String msg;
         private final Color color;
         private float alpha = 0f;
+        private float slide = 1f;
 
         ToastView(String msg, Color color) {
             this.msg = msg;
@@ -54,7 +57,11 @@ public final class Toast {
         protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, Math.max(0f, Math.min(1f, alpha))));
+
+            // slide like a record label notification
+            int dy = (int) (12 * slide);
+            g2.translate(0, dy);
 
             int w = getWidth();
             int h = getHeight();
