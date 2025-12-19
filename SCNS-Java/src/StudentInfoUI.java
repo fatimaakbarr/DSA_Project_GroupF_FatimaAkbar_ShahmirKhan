@@ -137,6 +137,7 @@ public class StudentInfoUI extends JPanel {
         gc.gridy = 0;
         gc.weightx = 1;
         gc.fill = GridBagConstraints.HORIZONTAL;
+        gc.anchor = GridBagConstraints.NORTHWEST;
         gc.insets = new Insets(10, 12, 4, 12);
         form.add(lRoll, gc);
 
@@ -175,6 +176,12 @@ public class StudentInfoUI extends JPanel {
         gc.gridy++;
         gc.insets = new Insets(0, 12, 12, 12);
         form.add(hint, gc);
+
+        // Push everything up (prevents dead space at top on tall windows)
+        gc.gridy++;
+        gc.weighty = 1;
+        gc.fill = GridBagConstraints.BOTH;
+        form.add(javax.swing.Box.createVerticalGlue(), gc);
 
         JScrollPane sp = new JScrollPane(cabinet);
         UIStyle.scrollPane(sp);

@@ -30,6 +30,21 @@ public class SmartCampusFrame extends JFrame {
     private final AnimatedSwitcher switcher = new AnimatedSwitcher();
     private SidebarNav sidebarNav; // for syncing Home cards with sidebar selection
 
+    private SidebarWrapper sidebarWrapper;
+
+    private void openScreen(String key) {
+        if (key == null) return;
+        if ("home".equals(key)) {
+            if (sidebarWrapper != null) sidebarWrapper.setExpanded(false, true);
+            if (sidebarNav != null) sidebarNav.selectKey("home");
+            switcher.switchTo("home");
+            return;
+        }
+        if (sidebarWrapper != null) sidebarWrapper.setExpanded(true, true);
+        if (sidebarNav != null) sidebarNav.selectKey(key);
+        switcher.switchTo(key);
+    }
+
     public SmartCampusFrame(NativeBridge nb) {
         super("SmartCampus DSA Project");
         this.nb = nb;
@@ -84,15 +99,15 @@ public class SmartCampusFrame extends JFrame {
             bgTimer.start();
 
             JPanel sidebar = buildSidebar();
-            sidebar.setPreferredSize(new Dimension(260, 10));
+            sidebarWrapper = new SidebarWrapper(sidebar);
+            sidebarWrapper.setExpanded(false, false); // hidden on home until a card is clicked
 
-            add(sidebar, BorderLayout.WEST);
+            add(sidebarWrapper, BorderLayout.WEST);
             add(switcher, BorderLayout.CENTER);
 
             // screens
             HomePanel home = new HomePanel(nb, key -> {
-                if (sidebarNav != null) sidebarNav.selectKey(key);
-                switcher.switchTo(key);
+                openScreen(key);
             });
             NavigatorUI nav = new NavigatorUI(nb, layers);
             StudentInfoUI sis = new StudentInfoUI(nb, layers);
@@ -165,6 +180,49 @@ public class SmartCampusFrame extends JFrame {
         return side;
     }
 
+    private static final class SidebarWrapper extends JPanel {
+        private final JComponent inner;
+        private float w = 0f;
+        private float target = 0f;
+
+        SidebarWrapper(JComponent inner) {
+            super(new BorderLayout());
+            this.inner = inner;
+            setOpaque(false);
+            add(inner, BorderLayout.CENTER);
+        }
+
+        void setExpanded(boolean expanded, boolean animate) {
+            target = expanded ? 260f : 0f;
+            if (!animate) {
+                w = target;
+                inner.setVisible(w > 1f);
+                revalidate();
+                repaint();
+                return;
+            }
+            float start = w;
+            float end = target;
+            inner.setVisible(true);
+            Anim.run(260, 60, t -> {
+                w = (float) (start + (end - start) * Anim.easeInOutCubic(t));
+                if (w < 2f && end == 0f) inner.setVisible(false);
+                revalidate();
+                repaint();
+            }, () -> {
+                w = end;
+                inner.setVisible(w > 1f);
+                revalidate();
+                repaint();
+            });
+        }
+
+        @Override
+        public Dimension getPreferredSize() {
+            return new Dimension((int) Math.max(0, w), 10);
+        }
+    }
+
     /** Sidebar navigation with animated active indicator. */
     private final class SidebarNav extends JPanel {
         private final ModernButton bHome = new ModernButton("Home", Theme.CARD, Theme.CARD_2);
@@ -193,10 +251,10 @@ public class SmartCampusFrame extends JFrame {
 
             select(bHome, false);
 
-            bHome.addActionListener(e -> { select(bHome, true); switcher.switchTo("home"); });
-            bNav.addActionListener(e -> { select(bNav, true); switcher.switchTo("nav"); });
-            bSIS.addActionListener(e -> { select(bSIS, true); switcher.switchTo("sis"); });
-            bAtt.addActionListener(e -> { select(bAtt, true); switcher.switchTo("att"); });
+            bHome.addActionListener(e -> openScreen("home"));
+            bNav.addActionListener(e -> openScreen("nav"));
+            bSIS.addActionListener(e -> openScreen("sis"));
+            bAtt.addActionListener(e -> openScreen("att"));
         }
 
         void selectKey(String key) {
@@ -368,7 +426,8 @@ class AnimatedSwitcher extends JPanel {
         transitioning = true;
         t = 0f;
 
-        Anim.run(420, 60, tt -> {
+        // Faster, smoother transition (less sluggish)
+        Anim.run(280, 60, tt -> {
             t = (float) Anim.easeInOutCubic(tt);
             repaint();
         }, () -> {
@@ -430,7 +489,7 @@ class AnimatedSwitcher extends JPanel {
         java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2 = img.createGraphics();
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        // avoid ultra-heavy rendering during snapshot to keep transitions snappy
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         c.paint(g2);
         g2.dispose();
