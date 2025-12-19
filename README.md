@@ -21,9 +21,10 @@ A **Data Structures & Algorithms** final project built as **one unified applicat
 
 | Module | Level‑1 DSA(s) | Level‑2 DSA(s) | What it does |
 |---|---|---|---|
-| **Campus Navigator** | Linked List, Hash Map, Queue | Graph + BFS / Dijkstra | Shortest route between campus locations + live visualization |
-| **Student Information System** | Searching/Sorting (listing) | AVL Tree | Insert/search/update/delete students + AVL visualization |
-| **Attendance Management** | Array / Queue, Hash Map | Min‑Heap / Priority Queue | Mark attendance, compute %, list defaulters (min‑heap priority) |
+| **Home** | — | — | Animated dashboard shell + module switcher |
+| **Campus Navigator** | Linked List, Hash Map, Queue | Graph + BFS / Dijkstra | **Algorithm Race** + route explanation (Fewest Stops vs Shortest Distance) |
+| **Student Information System** | — | AVL Tree | Practical student records (**persistent CSV**) + fast search + sorted listing |
+| **Attendance Management** | — | Min‑Heap / Priority Queue | Live attendance ring + defaulters list (min‑heap) stored per student |
 
 ---
 
@@ -32,26 +33,52 @@ A **Data Structures & Algorithms** final project built as **one unified applicat
 #### Campus Navigator (C++: `graph.cpp`, `graph.h`)
 - **Level‑1: Linked List**: adjacency list storage (fast edge iteration, memory-efficient)
 - **Level‑1: Hash Map**: location name → node index lookup (fast O(1) average)
-- **Level‑1: Queue**: BFS traversal order
+- **Level‑1: Queue**: BFS traversal order (unweighted)
 - **Level‑2: Graph + Algorithms**:
-  - **BFS**: shortest path by *number of hops*
-  - **Dijkstra** (with custom Min‑Heap priority queue): shortest weighted path
+  - **BFS graph (unweighted)**: optimizes **minimum hops**
+  - **Dijkstra graph (weighted)**: optimizes **minimum total weight** using a custom **Min‑Heap**
+
+**Non‑negotiable test case (hardcoded + verified):**
+
+Locations: `Gate, Admin, Library, Ground, Cafeteria`
+
+**BFS (unweighted adjacency list):**
+- Gate → Admin
+- Admin → Library
+- Gate → Ground
+- Ground → Cafeteria
+- Cafeteria → Library
+
+**Dijkstra (weighted adjacency list):**
+- Gate → Admin = 12
+- Admin → Library = 12
+- Gate → Ground = 3
+- Ground → Cafeteria = 3
+- Cafeteria → Library = 3
+
+**Expected (Gate → Library):**
+- **BFS** → `Gate → Admin → Library`
+- **Dijkstra** → `Gate → Ground → Cafeteria → Library`
 
 Operations used: insert nodes/edges, traverse, BFS, Dijkstra, path reconstruction.
 
-#### Student Information System (C++: `avl_tree.cpp`, `avl_tree.h`)
-- **Level‑2: AVL Tree**: self-balancing BST for fast search/insert/delete (O(log n))
-- **Level‑1: Searching/Sorting**: sorted listing by inorder traversal (and prepared sorting helpers)
+#### Student Information System (C++: `student_store.cpp/.h`, `avl_tree.cpp/.h`)
+- **Level‑2: AVL Tree**: practical in‑memory index (key = roll) for **O(log n)** search/insert/delete
+- **Persistent storage (fstream)**: CSV file is the permanent datastore (no data loss on restart)
+- **Sorting**: AVL **in‑order traversal** lists students sorted by roll
+- **Duplicate prevention**: inserting a student with an existing roll is rejected (no overwrite)
 
-Operations used: insert, update (upsert), search, delete, inorder traversal, rotations.
+CSV format:
 
-#### Attendance Management (C++: `heap_attendance.cpp`, `heap_attendance.h`)
-- **Level‑1: Array**: stores student attendance entries
-- **Level‑1: Queue**: attendance mark events (supports batching/visual feedback)
-- **Level‑1: Hash Map**: roll → entry index lookup
+`roll,name,program,semester,present,total`
+
+Default dataset: `data/students.csv` (100+ realistic records).
+
+#### Attendance Management (stored per student)
+- **Stored per student record**: attendance is part of `StudentRecord` (`present/total`)
 - **Level‑2: Min‑Heap**: defaulters list (pull lowest attendance quickly)
 
-Operations used: enqueue attendance mark, increment totals, heap push/pop, filtering.
+Operations used: increment totals (new day), mark present, compute percentage, heap push/pop for defaulters.
 
 ---
 
@@ -69,10 +96,22 @@ JNI entry points are implemented in **`Cpp-Native/native_impl.cpp`**.
 
 ---
 
+### C++ Header Restrictions (Course Rule)
+
+C++ sources in `Cpp-Native/` are written to comply with the restriction:
+
+- Allowed: `<iostream> <fstream> <vector> <string>` + required JNI headers (`jni.h`) + project headers
+- Avoids other standard headers (e.g., `<algorithm>`, `<sstream>`, etc.)
+
+---
+
 ### Project Structure
 
 ```
 /workspace
+  /data
+    students.csv                 (100+ realistic records; default datastore)
+
   /SCNS-Java/src
     MainMenu.java               (entry point)
     NativeBridge.java           (JNI native methods)
@@ -81,16 +120,16 @@ JNI entry points are implemented in **`Cpp-Native/native_impl.cpp`**.
     StudentInfoUI.java          (module UI)
     AttendanceUI.java           (module UI)
     GraphView.java              (route visualization)
-    TreeView.java               (AVL visualization)
     ProgressRing.java           (attendance visualization)
     Theme.java, Anim.java, Toast.java, JsonMini.java, ModernButton.java
 
   /Cpp-Native
     build.sh                    (Linux build)
+    build.bat                   (Windows build)
     native_impl.cpp             (JNI layer)
     graph.cpp / graph.h         (Navigator DSAs)
-    avl_tree.cpp / avl_tree.h   (Student DSAs)
-    heap_attendance.cpp/.h      (Attendance DSAs)
+    student_store.cpp/.h        (Student persistence + attendance)
+    avl_tree.cpp / avl_tree.h   (AVL index)
     dsa_level1.h                (LinkedList/HashMap/Queue)
     dsa_min_heap.h              (MinHeap)
     utils_json.cpp/.h           (JSON helpers)
@@ -128,6 +167,43 @@ Or use the one-shot helper:
 
 ---
 
+### How to Run (Windows)
+
+#### 1) Build the C++ JNI DLL
+
+- Install **JDK 17+** and **MinGW g++**
+- Ensure `JAVA_HOME` is set, then:
+
+```bat
+cd Cpp-Native
+build.bat
+```
+
+This produces `Cpp-Native\\campus_backend.dll`.
+
+#### 2) Compile + run Java
+
+```bat
+cd SCNS-Java\src
+javac *.java
+java MainMenu
+```
+
+---
+
+### Data Import/Export
+
+In **Student Info**:
+
+- **Import CSV**: switches the app to the chosen CSV file and rebuilds the AVL index
+- **Export CSV**: writes the current dataset to a chosen CSV path
+
+CSV format must be:
+
+`roll,name,program,semester,present,total`
+
+---
+
 ### Work Allocation (Per Module)
 
 - **Campus Navigator**
@@ -138,9 +214,9 @@ Or use the one-shot helper:
 - **Student Information System**
   - Lead: **Fatima Akbar**
   - Assist: **Shahmir Khan**
-  - DSA focus: AVL insert/search/update/delete + visualization + JNI integration
+  - DSA focus: AVL index + persistent CSV storage + validation + import/export
 
 - **Attendance Management**
   - Lead: **Shahmir Khan**
   - Assist: **Fatima Akbar**
-  - DSA focus: Queue/array tracking, min-heap defaulters, JNI methods, UI + testing
+  - DSA focus: attendance operations stored per student + min-heap defaulters + UI + testing
