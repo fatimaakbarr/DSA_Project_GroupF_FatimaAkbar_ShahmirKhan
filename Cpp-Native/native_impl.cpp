@@ -1,20 +1,107 @@
 #include <jni.h>
 
+#include <iostream>
 #include <string>
 #include <vector>
 
 #include "NativeBridge.h"
-#include "backend_state.h"
+#include "backend.h"
 #include "utils_json.h"
 
 extern "C" {
+
+using jsonutil::Kv;
+
+static jfieldID gHandleField = nullptr;
+
+static Backend* getBackend(JNIEnv* env, jobject obj) {
+  if (!obj) return nullptr;
+  if (!gHandleField) {
+    jclass cls = env->GetObjectClass(obj);
+    gHandleField = env->GetFieldID(cls, "handle", "J");
+  }
+  jlong h = env->GetLongField(obj, gHandleField);
+  return reinterpret_cast<Backend*>(h);
+}
+
+static void setBackend(JNIEnv* env, jobject obj, Backend* b) {
+  if (!gHandleField) {
+    jclass cls = env->GetObjectClass(obj);
+    gHandleField = env->GetFieldID(cls, "handle", "J");
+  }
+  env->SetLongField(obj, gHandleField, reinterpret_cast<jlong>(b));
+}
 
 JNIEXPORT jstring JNICALL Java_NativeBridge_testConnection(JNIEnv* env, jobject) {
   return env->NewStringUTF("JNI Connected Successfully!");
 }
 
-JNIEXPORT void JNICALL Java_NativeBridge_seedDemoData(JNIEnv*, jobject) {
-  backend().seedDemoData();
+JNIEXPORT jboolean JNICALL Java_NativeBridge_init(JNIEnv* env, jobject obj, jstring csvPath) {
+  const char* p = env->GetStringUTFChars(csvPath, nullptr);
+  std::string path = p ? std::string(p) : std::string("data/students.csv");
+  env->ReleaseStringUTFChars(csvPath, p);
+
+  Backend* cur = getBackend(env, obj);
+  if (cur) {
+    delete cur;
+    setBackend(env, obj, nullptr);
+  }
+
+  Backend* b = new Backend(path);
+  b->nav.seedDefault();
+  StoreResult lr = b->students.load();
+  (void)lr;
+
+  // ensure some initial data if file had none
+  if (b->students.count() == 0) {
+    StudentRecord s1; s1.roll = 101; s1.name = "Ayesha"; s1.program = "BSCS"; s1.semester = 3; s1.present = 5; s1.total = 10;
+    StudentRecord s2; s2.roll = 102; s2.name = "Hassan"; s2.program = "BBA";  s2.semester = 2; s2.present = 7; s2.total = 10;
+    StudentRecord s3; s3.roll = 103; s3.name = "Zara";   s3.program = "BSSE"; s3.semester = 4; s3.present = 3; s3.total = 10;
+    StudentRecord s4; s4.roll = 104; s4.name = "Ali";    s4.program = "BSAI"; s4.semester = 1; s4.present = 6; s4.total = 10;
+    b->students.addStudent(s1);
+    b->students.addStudent(s2);
+    b->students.addStudent(s3);
+    b->students.addStudent(s4);
+  }
+
+  setBackend(env, obj, b);
+  return JNI_TRUE;
+}
+
+JNIEXPORT void JNICALL Java_NativeBridge_close(JNIEnv* env, jobject obj) {
+  Backend* b = getBackend(env, obj);
+  if (b) {
+    delete b;
+    setBackend(env, obj, nullptr);
+  }
+}
+
+JNIEXPORT jstring JNICALL Java_NativeBridge_sisImportCsv(JNIEnv* env, jobject obj, jstring csvPath) {
+  Backend* bkend = getBackend(env, obj);
+  if (!bkend) return env->NewStringUTF("{\"ok\":false,\"message\":\"Backend not initialized.\"}");
+  const char* p = env->GetStringUTFChars(csvPath, nullptr);
+  std::string path = p ? std::string(p) : std::string();
+  env->ReleaseStringUTFChars(csvPath, p);
+
+  StoreResult sr = bkend->students.switchToFile(path);
+  std::vector<Kv> kv;
+  kv.push_back(Kv{"ok", sr.ok ? "true" : "false"});
+  kv.push_back(Kv{"message", jsonutil::quote(sr.message)});
+  return env->NewStringUTF(jsonutil::obj(kv).c_str());
+}
+
+JNIEXPORT jstring JNICALL Java_NativeBridge_sisExportCsv(JNIEnv* env, jobject obj, jstring csvPath) {
+  Backend* bkend = getBackend(env, obj);
+  if (!bkend) return env->NewStringUTF("{\"ok\":false,\"message\":\"Backend not initialized.\"}");
+  const char* p = env->GetStringUTFChars(csvPath, nullptr);
+  std::string path = p ? std::string(p) : std::string();
+  env->ReleaseStringUTFChars(csvPath, p);
+
+  StoreResult sr = bkend->students.exportTo(path);
+  std::vector<Kv> kv;
+  kv.push_back(Kv{"ok", sr.ok ? "true" : "false"});
+  kv.push_back(Kv{"message", jsonutil::quote(sr.message)});
+  return env->NewStringUTF(jsonutil::obj(kv).c_str());
 }
 
 // Backwards compatibility with earlier scaffold
@@ -22,7 +109,8 @@ JNIEXPORT jstring JNICALL Java_NativeBridge_getShortestPath(JNIEnv* env, jobject
   const char* a = env->GetStringUTFChars(src, nullptr);
   const char* b = env->GetStringUTFChars(dest, nullptr);
 
-  PathResult pr = backend().graph.dijkstraShortestPath(a ? a : "", b ? b : "");
+  CampusGraph g;
+  PathResult pr = g.dijkstraShortestPath(a ? a : "", b ? b : "");
 
   env->ReleaseStringUTFChars(src, a);
   env->ReleaseStringUTFChars(dest, b);
@@ -45,8 +133,11 @@ JNIEXPORT jstring JNICALL Java_NativeBridge_getShortestPath(JNIEnv* env, jobject
   return env->NewStringUTF(out.c_str());
 }
 
-JNIEXPORT jobjectArray JNICALL Java_NativeBridge_navLocations(JNIEnv* env, jobject) {
-  std::vector<std::string> locs = backend().graph.locations();
+JNIEXPORT jobjectArray JNICALL Java_NativeBridge_navLocations(JNIEnv* env, jobject obj) {
+  Backend* b = getBackend(env, obj);
+  CampusGraph* g = b ? &b->nav : nullptr;
+  CampusGraph local;
+  std::vector<std::string> locs = (g ? g->locations() : local.locations());
   jclass stringClass = env->FindClass("java/lang/String");
   jobjectArray arr = env->NewObjectArray((jsize)locs.size(), stringClass, env->NewStringUTF(""));
   for (jsize i = 0; i < (jsize)locs.size(); i++) {
@@ -55,47 +146,59 @@ JNIEXPORT jobjectArray JNICALL Java_NativeBridge_navLocations(JNIEnv* env, jobje
   return arr;
 }
 
-JNIEXPORT jstring JNICALL Java_NativeBridge_navShortestPath(JNIEnv* env, jobject, jstring src, jstring dest, jstring algorithm) {
+JNIEXPORT jstring JNICALL Java_NativeBridge_navShortestPath(JNIEnv* env, jobject obj, jstring src, jstring dest, jstring algorithm) {
+  Backend* bkend = getBackend(env, obj);
+  CampusGraph* g = bkend ? &bkend->nav : nullptr;
+  CampusGraph local;
+
   const char* a = env->GetStringUTFChars(src, nullptr);
   const char* b = env->GetStringUTFChars(dest, nullptr);
   const char* alg = env->GetStringUTFChars(algorithm, nullptr);
 
   std::string algs = alg ? std::string(alg) : std::string();
-  PathResult pr = (algs == "BFS") ? backend().graph.bfsShortestPath(a ? a : "", b ? b : "")
-                                 : backend().graph.dijkstraShortestPath(a ? a : "", b ? b : "");
+  PathResult pr = (algs == "BFS") ? (g ? g->bfsShortestPath(a ? a : "", b ? b : "") : local.bfsShortestPath(a ? a : "", b ? b : ""))
+                                 : (g ? g->dijkstraShortestPath(a ? a : "", b ? b : "") : local.dijkstraShortestPath(a ? a : "", b ? b : ""));
 
   env->ReleaseStringUTFChars(src, a);
   env->ReleaseStringUTFChars(dest, b);
   env->ReleaseStringUTFChars(algorithm, alg);
 
-  using namespace jsonutil;
   if (pr.distance < 0 || pr.path.empty()) {
     std::vector<Kv> kv;
     kv.push_back(Kv{"ok", "false"});
-    kv.push_back(Kv{"error", quote("No route found (check locations).")});
-    kv.push_back(Kv{"algorithm", quote(pr.algorithm)});
-    std::string out = obj(kv);
+    kv.push_back(Kv{"error", jsonutil::quote("No route found (check locations).")});
+    kv.push_back(Kv{"algorithm", jsonutil::quote(pr.algorithm)});
+    std::string out = jsonutil::obj(kv);
     return env->NewStringUTF(out.c_str());
   }
 
   std::vector<std::string> pathQuoted;
-  for (const auto& s : pr.path) pathQuoted.push_back(quote(s));
+  for (const auto& s : pr.path) pathQuoted.push_back(jsonutil::quote(s));
   std::vector<std::string> visQuoted;
-  for (const auto& s : pr.visitedOrder) visQuoted.push_back(quote(s));
+  for (const auto& s : pr.visitedOrder) visQuoted.push_back(jsonutil::quote(s));
 
   std::vector<Kv> kv;
   kv.push_back(Kv{"ok", "true"});
-  kv.push_back(Kv{"algorithm", quote(pr.algorithm)});
+  kv.push_back(Kv{"algorithm", jsonutil::quote(pr.algorithm)});
   kv.push_back(Kv{"distance", std::to_string(pr.distance)});
   kv.push_back(Kv{"hops", std::to_string(pr.hops)});
   kv.push_back(Kv{"cost", std::to_string(pr.cost)});
-  kv.push_back(Kv{"path", arr(pathQuoted)});
-  kv.push_back(Kv{"visited", arr(visQuoted)});
-  std::string out = obj(kv);
+  kv.push_back(Kv{"path", jsonutil::arr(pathQuoted)});
+  kv.push_back(Kv{"visited", jsonutil::arr(visQuoted)});
+  std::string out = jsonutil::obj(kv);
   return env->NewStringUTF(out.c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_NativeBridge_sisUpsertStudent(JNIEnv* env, jobject, jint roll, jstring name, jstring program, jint year) {
+// Insert-only (prevents overwrite) per requirements.
+JNIEXPORT jstring JNICALL Java_NativeBridge_sisUpsertStudent(JNIEnv* env, jobject obj, jint roll, jstring name, jstring program, jint year) {
+  Backend* bkend = getBackend(env, obj);
+  if (!bkend) {
+    std::vector<Kv> kv;
+    kv.push_back(Kv{"ok", "false"});
+    kv.push_back(Kv{"message", jsonutil::quote("Backend not initialized. Restart app.")});
+    return env->NewStringUTF(jsonutil::obj(kv).c_str());
+  }
+
   const char* n = env->GetStringUTFChars(name, nullptr);
   const char* p = env->GetStringUTFChars(program, nullptr);
 
@@ -103,135 +206,138 @@ JNIEXPORT jstring JNICALL Java_NativeBridge_sisUpsertStudent(JNIEnv* env, jobjec
   r.roll = (int)roll;
   r.name = n ? std::string(n) : std::string();
   r.program = p ? std::string(p) : std::string();
-  r.year = (int)year;
+  r.semester = (int)year;
+  r.present = 0;
+  r.total = 0;
 
   env->ReleaseStringUTFChars(name, n);
   env->ReleaseStringUTFChars(program, p);
 
-  bool inserted = backend().students.upsert(r);
-  backend().attendance.registerStudent(r.roll, r.name);
-
-  using namespace jsonutil;
+  StoreResult sr = bkend->students.addStudent(r);
   std::vector<Kv> kv;
-  kv.push_back(Kv{"ok", "true"});
-  kv.push_back(Kv{"action", quote(inserted ? "inserted" : "updated")});
-  std::string out = obj(kv);
-  return env->NewStringUTF(out.c_str());
+  kv.push_back(Kv{"ok", sr.ok ? "true" : "false"});
+  kv.push_back(Kv{"message", jsonutil::quote(sr.message)});
+  return env->NewStringUTF(jsonutil::obj(kv).c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_NativeBridge_sisGetStudent(JNIEnv* env, jobject, jint roll) {
+JNIEXPORT jstring JNICALL Java_NativeBridge_sisGetStudent(JNIEnv* env, jobject obj, jint roll) {
+  Backend* bkend = getBackend(env, obj);
+  if (!bkend) return env->NewStringUTF("");
   StudentRecord r;
-  if (!backend().students.find((int)roll, r)) return env->NewStringUTF("");
+  StoreResult sr = bkend->students.getStudent((int)roll, r);
+  if (!sr.ok) return env->NewStringUTF("");
 
-  using namespace jsonutil;
   std::vector<Kv> kv;
   kv.push_back(Kv{"roll", std::to_string(r.roll)});
-  kv.push_back(Kv{"name", quote(r.name)});
-  kv.push_back(Kv{"program", quote(r.program)});
-  kv.push_back(Kv{"year", std::to_string(r.year)});
-  std::string out = obj(kv);
+  kv.push_back(Kv{"name", jsonutil::quote(r.name)});
+  kv.push_back(Kv{"program", jsonutil::quote(r.program)});
+  kv.push_back(Kv{"year", std::to_string(r.semester)});
+  kv.push_back(Kv{"present", std::to_string(r.present)});
+  kv.push_back(Kv{"total", std::to_string(r.total)});
+  std::string out = jsonutil::obj(kv);
   return env->NewStringUTF(out.c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_NativeBridge_sisDeleteStudent(JNIEnv* env, jobject, jint roll) {
-  bool removed = backend().students.remove((int)roll);
-  if (removed) {
-    backend().attendance.removeStudent((int)roll);
+JNIEXPORT jstring JNICALL Java_NativeBridge_sisDeleteStudent(JNIEnv* env, jobject obj, jint roll) {
+  Backend* bkend = getBackend(env, obj);
+  if (!bkend) {
+    std::vector<Kv> kv;
+    kv.push_back(Kv{"ok", "false"});
+    kv.push_back(Kv{"message", jsonutil::quote("Backend not initialized.")});
+    return env->NewStringUTF(jsonutil::obj(kv).c_str());
   }
-  using namespace jsonutil;
+
+  StoreResult sr = bkend->students.deleteStudent((int)roll);
   std::vector<Kv> kv;
-  kv.push_back(Kv{"ok", removed ? "true" : "false"});
-  kv.push_back(Kv{"message", quote(removed ? "Student removed." : "Student not found.")});
-  std::string out = obj(kv);
-  return env->NewStringUTF(out.c_str());
+  kv.push_back(Kv{"ok", sr.ok ? "true" : "false"});
+  kv.push_back(Kv{"message", jsonutil::quote(sr.message)});
+  return env->NewStringUTF(jsonutil::obj(kv).c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_NativeBridge_sisListStudents(JNIEnv* env, jobject) {
-  using namespace jsonutil;
-  std::vector<StudentRecord> all = backend().students.inorder();
+JNIEXPORT jstring JNICALL Java_NativeBridge_sisListStudents(JNIEnv* env, jobject obj) {
+  Backend* bkend = getBackend(env, obj);
+  if (!bkend) return env->NewStringUTF("[]");
+  std::vector<StudentRecord> all = bkend->students.listByRoll();
   std::vector<std::string> items;
   items.reserve(all.size());
   for (const auto& r : all) {
     std::vector<Kv> kv;
     kv.push_back(Kv{"roll", std::to_string(r.roll)});
-    kv.push_back(Kv{"name", quote(r.name)});
-    kv.push_back(Kv{"program", quote(r.program)});
-    kv.push_back(Kv{"year", std::to_string(r.year)});
-    items.push_back(obj(kv));
+    kv.push_back(Kv{"name", jsonutil::quote(r.name)});
+    kv.push_back(Kv{"program", jsonutil::quote(r.program)});
+    kv.push_back(Kv{"year", std::to_string(r.semester)});
+    kv.push_back(Kv{"present", std::to_string(r.present)});
+    kv.push_back(Kv{"total", std::to_string(r.total)});
+    items.push_back(jsonutil::obj(kv));
   }
-  return env->NewStringUTF(arr(items).c_str());
+  return env->NewStringUTF(jsonutil::arr(items).c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_NativeBridge_sisTreeSnapshot(JNIEnv* env, jobject) {
-  using namespace jsonutil;
-  auto edges = backend().students.snapshotEdges();
-  std::vector<std::string> items;
-  items.reserve(edges.size());
-  for (const auto& e : edges) {
-    items.push_back(arr({std::to_string(e[0]), std::to_string(e[1]), std::to_string(e[2])}));
+JNIEXPORT jstring JNICALL Java_NativeBridge_attNewSessionDay(JNIEnv* env, jobject obj) {
+  Backend* bkend = getBackend(env, obj);
+  if (!bkend) {
+    std::vector<Kv> kv;
+    kv.push_back(Kv{"ok", "false"});
+    kv.push_back(Kv{"message", jsonutil::quote("Backend not initialized.")});
+    return env->NewStringUTF(jsonutil::obj(kv).c_str());
   }
-  return env->NewStringUTF(arr(items).c_str());
-}
 
-JNIEXPORT jstring JNICALL Java_NativeBridge_attRegisterStudent(JNIEnv* env, jobject, jint roll, jstring name) {
-  const char* n = env->GetStringUTFChars(name, nullptr);
-  bool inserted = backend().attendance.registerStudent((int)roll, n ? std::string(n) : std::string());
-  env->ReleaseStringUTFChars(name, n);
-
-  using namespace jsonutil;
+  StoreResult sr = bkend->students.newDayForAll();
   std::vector<Kv> kv;
-  kv.push_back(Kv{"ok", "true"});
-  kv.push_back(Kv{"action", quote(inserted ? "registered" : "updated")});
-  return env->NewStringUTF(obj(kv).c_str());
+  kv.push_back(Kv{"ok", sr.ok ? "true" : "false"});
+  kv.push_back(Kv{"message", jsonutil::quote(sr.message)});
+  return env->NewStringUTF(jsonutil::obj(kv).c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_NativeBridge_attNewSessionDay(JNIEnv* env, jobject) {
-  bool ok = backend().attendance.incrementTotalForAll();
-  using namespace jsonutil;
+JNIEXPORT jstring JNICALL Java_NativeBridge_attMarkPresent(JNIEnv* env, jobject obj, jint roll) {
+  Backend* bkend = getBackend(env, obj);
+  if (!bkend) {
+    std::vector<Kv> kv;
+    kv.push_back(Kv{"ok", "false"});
+    kv.push_back(Kv{"message", jsonutil::quote("Backend not initialized.")});
+    return env->NewStringUTF(jsonutil::obj(kv).c_str());
+  }
+
+  StoreResult sr = bkend->students.markPresent((int)roll);
   std::vector<Kv> kv;
-  kv.push_back(Kv{"ok", ok ? "true" : "false"});
-  kv.push_back(Kv{"message", quote(ok ? "New class day recorded." : "No students registered.")});
-  return env->NewStringUTF(obj(kv).c_str());
+  kv.push_back(Kv{"ok", sr.ok ? "true" : "false"});
+  kv.push_back(Kv{"message", jsonutil::quote(sr.message)});
+  return env->NewStringUTF(jsonutil::obj(kv).c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_NativeBridge_attMarkPresent(JNIEnv* env, jobject, jint roll) {
-  bool ok = backend().attendance.markPresent((int)roll);
-  using namespace jsonutil;
+JNIEXPORT jstring JNICALL Java_NativeBridge_attGetSummary(JNIEnv* env, jobject obj, jint roll) {
+  Backend* bkend = getBackend(env, obj);
+  if (!bkend) return env->NewStringUTF("");
+  StudentRecord r;
+  StoreResult sr = bkend->students.getStudent((int)roll, r);
+  if (!sr.ok) return env->NewStringUTF("");
   std::vector<Kv> kv;
-  kv.push_back(Kv{"ok", ok ? "true" : "false"});
-  kv.push_back(Kv{"message", quote(ok ? "Marked present." : "Roll not found.")});
-  return env->NewStringUTF(obj(kv).c_str());
+  kv.push_back(Kv{"roll", std::to_string(r.roll)});
+  kv.push_back(Kv{"name", jsonutil::quote(r.name)});
+  kv.push_back(Kv{"present", std::to_string(r.present)});
+  kv.push_back(Kv{"total", std::to_string(r.total)});
+  int pct = (r.total > 0) ? (r.present * 100) / r.total : 0;
+  kv.push_back(Kv{"percent", std::to_string(pct)});
+  return env->NewStringUTF(jsonutil::obj(kv).c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_NativeBridge_attGetSummary(JNIEnv* env, jobject, jint roll) {
-  AttendanceSummary s;
-  if (!backend().attendance.getSummary((int)roll, s)) return env->NewStringUTF("");
-
-  using namespace jsonutil;
-  std::vector<Kv> kv;
-  kv.push_back(Kv{"roll", std::to_string(s.roll)});
-  kv.push_back(Kv{"name", quote(s.name)});
-  kv.push_back(Kv{"present", std::to_string(s.present)});
-  kv.push_back(Kv{"total", std::to_string(s.total)});
-  kv.push_back(Kv{"percent", std::to_string(s.percent)});
-  return env->NewStringUTF(obj(kv).c_str());
-}
-
-JNIEXPORT jstring JNICALL Java_NativeBridge_attGetDefaulters(JNIEnv* env, jobject, jint minPercent) {
-  using namespace jsonutil;
-  auto list = backend().attendance.defaultersBelow((int)minPercent);
+JNIEXPORT jstring JNICALL Java_NativeBridge_attGetDefaulters(JNIEnv* env, jobject obj, jint minPercent) {
+  Backend* bkend = getBackend(env, obj);
+  if (!bkend) return env->NewStringUTF("[]");
+  auto list = bkend->students.defaultersBelow((int)minPercent);
   std::vector<std::string> items;
   items.reserve(list.size());
   for (const auto& s : list) {
     std::vector<Kv> kv;
     kv.push_back(Kv{"roll", std::to_string(s.roll)});
-    kv.push_back(Kv{"name", quote(s.name)});
+    kv.push_back(Kv{"name", jsonutil::quote(s.name)});
     kv.push_back(Kv{"present", std::to_string(s.present)});
     kv.push_back(Kv{"total", std::to_string(s.total)});
-    kv.push_back(Kv{"percent", std::to_string(s.percent)});
-    items.push_back(obj(kv));
+    int pct = (s.total > 0) ? (s.present * 100) / s.total : 0;
+    kv.push_back(Kv{"percent", std::to_string(pct)});
+    items.push_back(jsonutil::obj(kv));
   }
-  return env->NewStringUTF(arr(items).c_str());
+  return env->NewStringUTF(jsonutil::arr(items).c_str());
 }
 
 } // extern "C"

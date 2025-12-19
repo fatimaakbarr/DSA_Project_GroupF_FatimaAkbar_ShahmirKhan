@@ -7,7 +7,9 @@ struct StudentRecord {
   int roll = 0;
   std::string name;
   std::string program;
-  int year = 1;
+  int semester = 1;
+  int present = 0;
+  int total = 0;
 };
 
 class AvlStudentDB {
@@ -17,13 +19,17 @@ class AvlStudentDB {
   AvlStudentDB& operator=(const AvlStudentDB&) = delete;
   ~AvlStudentDB();
 
-  bool upsert(const StudentRecord& r); // insert or update
+  // Practical DB semantics:
+  // - insert: fails if roll already exists (prevents overwrite)
+  // - update: fails if roll does not exist
+  bool insert(const StudentRecord& r);
+  bool update(const StudentRecord& r);
   bool remove(int roll);
   bool find(int roll, StudentRecord& out) const;
   std::vector<StudentRecord> inorder() const;
 
-  // For visualization: returns nodes in level order as tuples [roll, leftRollOr0, rightRollOr0]
-  std::vector<std::vector<int>> snapshotEdges() const;
+  int size() const { return size_; }
+  void clear();
 
  private:
   struct Node {
@@ -35,6 +41,7 @@ class AvlStudentDB {
   };
 
   Node* root_ = nullptr;
+  int size_ = 0;
 
   static int height(Node* n);
   static int bf(Node* n);
@@ -44,12 +51,11 @@ class AvlStudentDB {
   static Node* rotateLeft(Node* x);
   static Node* balance(Node* n);
 
-  static Node* insertOrUpdate(Node* n, const StudentRecord& r, bool& insertedNew);
+  static Node* insertOnly(Node* n, const StudentRecord& r, bool& insertedNew);
+  static Node* updateOnly(Node* n, const StudentRecord& r, bool& updated);
   static Node* erase(Node* n, int roll, bool& removed);
   static Node* minNode(Node* n);
 
   static void destroy(Node* n);
   static void inorderCollect(Node* n, std::vector<StudentRecord>& out);
-
-  static void snapshot(Node* n, std::vector<std::vector<int>>& out);
 };

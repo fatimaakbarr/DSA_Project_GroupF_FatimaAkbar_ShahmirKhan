@@ -49,16 +49,25 @@ void CampusGraph::seedDefault() {
       "Gate", "Admin", "Library", "Cafeteria", "Block-A", "Block-B", "Lab", "Ground", "Hostel"};
   for (auto n : nodes) addLocation(n);
 
+  // Weights are \"walking time\" units (lower is better).
+  // Designed so BFS (fewest hops) and Dijkstra (lowest total weight) can differ.
+  //
+  // Example from Gate -> Library:
+  // - BFS: Gate -> Library (1 hop, but heavy weight)
+  // - Dijkstra: Gate -> Ground -> Cafeteria -> Library (3 hops, but lower total)
+  addEdge("Gate", "Library", 15);      // direct but \"crowded\" path
   addEdge("Gate", "Admin", 3);
-  addEdge("Gate", "Library", 5);
+  addEdge("Gate", "Ground", 2);
+
+  addEdge("Ground", "Cafeteria", 2);
+  addEdge("Cafeteria", "Library", 2);
+
   addEdge("Admin", "Block-A", 4);
   addEdge("Admin", "Block-B", 6);
-  addEdge("Library", "Cafeteria", 2);
-  addEdge("Cafeteria", "Ground", 2);
   addEdge("Block-A", "Lab", 3);
   addEdge("Block-B", "Lab", 2);
-  addEdge("Ground", "Hostel", 4);
   addEdge("Lab", "Hostel", 5);
+  addEdge("Ground", "Hostel", 4);
 }
 
 std::vector<std::string> CampusGraph::locations() const {

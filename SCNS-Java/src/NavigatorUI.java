@@ -62,7 +62,7 @@ public class NavigatorUI extends JPanel {
         title.setForeground(Theme.TEXT);
         title.setFont(title.getFont().deriveFont(Font.BOLD, 22f));
 
-        JLabel sub = new JLabel("BFS = fewest hops • Dijkstra = minimum distance (weighted) • Visual route + visited order");
+        JLabel sub = new JLabel("Weighted campus graph • BFS = Fewest Stops • Dijkstra = Shortest Distance");
         sub.setForeground(Theme.MUTED);
 
         JPanel left = new JPanel();
@@ -87,25 +87,25 @@ public class NavigatorUI extends JPanel {
         JLabel l2 = new JLabel("To");
         l2.setForeground(Theme.MUTED);
 
-        PillToggle bBfs = new PillToggle("BFS");
-        PillToggle bDij = new PillToggle("Dijkstra");
+        PillToggle bBfs = new PillToggle("Fewest Stops");
+        PillToggle bDij = new PillToggle("Shortest Distance");
         setAlgoButtons(bBfs, bDij);
 
         bBfs.addActionListener(e -> {
             algorithm = "BFS";
             setAlgoButtons(bBfs, bDij);
-            out.setText("Algorithm: BFS (hops)   •   Pick two locations and click Compute Route.");
+            out.setText("Fewest Stops (BFS)   •   Pick two locations and click Compute Route.");
         });
         bDij.addActionListener(e -> {
             algorithm = "Dijkstra";
             setAlgoButtons(bBfs, bDij);
-            out.setText("Algorithm: Dijkstra (weighted)   •   Pick two locations and click Compute Route.");
+            out.setText("Shortest Distance (Dijkstra)   •   Pick two locations and click Compute Route.");
         });
 
         ModernButton run = new ModernButton("Compute Route", Theme.ACCENT, Theme.ACCENT_2);
         run.addActionListener(e -> compute());
 
-        ModernButton cmp = new ModernButton("Compare", Theme.CARD, Theme.CARD_2);
+        ModernButton cmp = new ModernButton("Compare BFS vs Dijkstra", Theme.CARD, Theme.CARD_2);
         cmp.addActionListener(e -> compare());
 
         out.setForeground(Theme.TEXT);
@@ -199,6 +199,7 @@ public class NavigatorUI extends JPanel {
         compare.setText("Tip: click Compare to see both algorithms at once.");
         chips.setChips(new String[] { "Visited: " + visited.size(), "Hops: " + hops, "Cost: " + cost },
                 new java.awt.Color[] { Theme.ACCENT_2, Theme.CARD_2, Theme.CARD_2 });
+        graph.setMode(algorithm);
         graph.animateResult(path, visited);
     }
 
@@ -246,6 +247,7 @@ public class NavigatorUI extends JPanel {
         boolean primaryIsBfs = "BFS".equals(algorithm);
         java.util.List<String> primary = primaryIsBfs ? bfsPath : dijPath;
         java.util.List<String> secondary = primaryIsBfs ? dijPath : bfsPath;
+        graph.setMode("Dijkstra");
         graph.animateCompare(primary, secondary, visited);
     }
 

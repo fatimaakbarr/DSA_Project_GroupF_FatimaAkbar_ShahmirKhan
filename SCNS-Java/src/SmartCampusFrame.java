@@ -1,4 +1,5 @@
 import java.awt.BorderLayout;
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -440,10 +441,17 @@ class HomePanel extends JPanel {
 
     private static final class Hero extends JComponent {
         private final String status;
+        private float t = 0f;
+        private final javax.swing.Timer anim;
 
         Hero(NativeBridge nb) {
             setOpaque(false);
             this.status = nb.testConnection();
+            anim = new javax.swing.Timer(16, e -> {
+                t += 0.018f;
+                repaint();
+            });
+            anim.start();
         }
 
         @Override
@@ -456,6 +464,35 @@ class HomePanel extends JPanel {
 
             g2.setColor(new Color(0, 0, 0, 80));
             g2.fillRoundRect(0, 0, w, h, 28, 28);
+
+            // Campus-themed animation: a \"drone\" dot surveying nodes + a glowing path pulse.
+            // (Memorable but still relevant to the navigator module.)
+            double cx = w * 0.74;
+            double cy = h * 0.58;
+            double rx = Math.max(120, w * 0.18);
+            double ry = Math.max(90, h * 0.16);
+            double ang = t;
+            double dx = cx + Math.cos(ang) * rx;
+            double dy = cy + Math.sin(ang * 1.12) * ry;
+
+            // faint orbit path
+            g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            g2.setColor(new Color(255, 255, 255, 22));
+            g2.drawOval((int) (cx - rx), (int) (cy - ry), (int) (rx * 2), (int) (ry * 2));
+
+            // pulsing scan line
+            double scanX = w * 0.52 + Math.sin(t * 0.9) * (w * 0.22);
+            g2.setColor(new Color(Theme.ACCENT_2.getRed(), Theme.ACCENT_2.getGreen(), Theme.ACCENT_2.getBlue(), 30));
+            g2.setStroke(new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            g2.drawLine((int) scanX, (int) (h * 0.22), (int) scanX, (int) (h * 0.88));
+
+            // drone glow + core
+            float pulse = (float) (0.5 + 0.5 * Math.sin(t * 2.2));
+            int ga = 70 + (int) (70 * pulse);
+            g2.setColor(new Color(Theme.ACCENT.getRed(), Theme.ACCENT.getGreen(), Theme.ACCENT.getBlue(), ga));
+            g2.fillOval((int) (dx - 14), (int) (dy - 14), 28, 28);
+            g2.setColor(new Color(255, 255, 255, 220));
+            g2.fillOval((int) (dx - 4), (int) (dy - 4), 8, 8);
 
             g2.setColor(Theme.TEXT);
             g2.setFont(getFont().deriveFont(Font.BOLD, 32f));

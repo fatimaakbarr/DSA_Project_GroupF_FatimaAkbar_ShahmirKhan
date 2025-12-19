@@ -24,7 +24,7 @@ g++ -std=c++17 -O2 -fPIC -shared \
   "${ROOT_DIR}/native_impl.cpp" \
   "${ROOT_DIR}/graph.cpp" \
   "${ROOT_DIR}/avl_tree.cpp" \
-  "${ROOT_DIR}/heap_attendance.cpp" \
+  "${ROOT_DIR}/student_store.cpp" \
   "${ROOT_DIR}/utils_json.cpp" \
   "${JNI_INCLUDE[@]}" \
   -o "${OUT_LIB}"

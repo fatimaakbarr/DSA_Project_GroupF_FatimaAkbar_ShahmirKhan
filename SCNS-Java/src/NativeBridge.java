@@ -1,5 +1,8 @@
 public class NativeBridge {
 
+    // Native backend handle (no global state on C++ side)
+    private long handle = 0;
+
     static {
         // Cross-platform JNI loader:
         // - Windows: Cpp-Native/campus_backend.dll
@@ -34,7 +37,8 @@ public class NativeBridge {
 
     // Core
     public native String testConnection();
-    public native void seedDemoData();
+    public native boolean init(String csvPath);
+    public native void close();
 
     // Navigator (Graph + BFS/Dijkstra)
     public native String[] navLocations();
@@ -45,14 +49,27 @@ public class NativeBridge {
     public native String sisGetStudent(int roll);
     public native String sisDeleteStudent(int roll);
     public native String sisListStudents();
-    public native String sisTreeSnapshot();
-
-    // Attendance (Queue/Array + Min-Heap)
-    public native String attRegisterStudent(int roll, String name);
+    public native String sisImportCsv(String csvPath);
+    public native String sisExportCsv(String csvPath);
+    // Attendance (stored in student records)
     public native String attNewSessionDay();
     public native String attMarkPresent(int roll);
     public native String attGetSummary(int roll);
     public native String attGetDefaulters(int minPercent);
+
+    public NativeBridge() {
+        // default data location relative to repo root
+        String path = "data/students.csv";
+        try {
+            java.io.File f = new java.io.File(path);
+            java.io.File parent = f.getParentFile();
+            if (parent != null) parent.mkdirs();
+        } catch (Throwable ignored) {}
+        init(path);
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try { close(); } catch (Throwable ignored) {}
+        }));
+    }
 }
 
 

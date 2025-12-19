@@ -5,8 +5,13 @@
 static inline int imax(int a, int b) { return a > b ? a : b; }
 
 AvlStudentDB::~AvlStudentDB() {
+  clear();
+}
+
+void AvlStudentDB::clear() {
   destroy(root_);
   root_ = nullptr;
+  size_ = 0;
 }
 
 int AvlStudentDB::height(Node* n) { return n ? n->h : 0; }
@@ -52,17 +57,24 @@ AvlStudentDB::Node* AvlStudentDB::balance(Node* n) {
   return n;
 }
 
-AvlStudentDB::Node* AvlStudentDB::insertOrUpdate(Node* n, const StudentRecord& r, bool& insertedNew) {
+AvlStudentDB::Node* AvlStudentDB::insertOnly(Node* n, const StudentRecord& r, bool& insertedNew) {
   if (!n) {
     insertedNew = true;
     return new Node(r);
   }
-  if (r.roll < n->rec.roll) n->left = insertOrUpdate(n->left, r, insertedNew);
-  else if (r.roll > n->rec.roll) n->right = insertOrUpdate(n->right, r, insertedNew);
+  if (r.roll < n->rec.roll) n->left = insertOnly(n->left, r, insertedNew);
+  else if (r.roll > n->rec.roll) n->right = insertOnly(n->right, r, insertedNew);
+  else insertedNew = false; // prevent overwrite
+  return balance(n);
+}
+
+AvlStudentDB::Node* AvlStudentDB::updateOnly(Node* n, const StudentRecord& r, bool& updated) {
+  if (!n) return nullptr;
+  if (r.roll < n->rec.roll) n->left = updateOnly(n->left, r, updated);
+  else if (r.roll > n->rec.roll) n->right = updateOnly(n->right, r, updated);
   else {
-    // update
     n->rec = r;
-    insertedNew = false;
+    updated = true;
     return n;
   }
   return balance(n);
@@ -106,16 +118,24 @@ void AvlStudentDB::inorderCollect(Node* n, std::vector<StudentRecord>& out) {
   inorderCollect(n->right, out);
 }
 
-bool AvlStudentDB::upsert(const StudentRecord& r) {
-  bool insertedNew = false;
-  root_ = insertOrUpdate(root_, r, insertedNew);
-  return insertedNew;
-}
-
 bool AvlStudentDB::remove(int roll) {
   bool removed = false;
   root_ = erase(root_, roll, removed);
+  if (removed) size_--;
   return removed;
+}
+
+bool AvlStudentDB::insert(const StudentRecord& r) {
+  bool insertedNew = false;
+  root_ = insertOnly(root_, r, insertedNew);
+  if (insertedNew) size_++;
+  return insertedNew;
+}
+
+bool AvlStudentDB::update(const StudentRecord& r) {
+  bool updated = false;
+  root_ = updateOnly(root_, r, updated);
+  return updated;
 }
 
 bool AvlStudentDB::find(int roll, StudentRecord& out) const {
@@ -134,20 +154,5 @@ bool AvlStudentDB::find(int roll, StudentRecord& out) const {
 std::vector<StudentRecord> AvlStudentDB::inorder() const {
   std::vector<StudentRecord> out;
   inorderCollect(root_, out);
-  return out;
-}
-
-void AvlStudentDB::snapshot(Node* n, std::vector<std::vector<int>>& out) {
-  if (!n) return;
-  int left = n->left ? n->left->rec.roll : 0;
-  int right = n->right ? n->right->rec.roll : 0;
-  out.push_back({n->rec.roll, left, right});
-  snapshot(n->left, out);
-  snapshot(n->right, out);
-}
-
-std::vector<std::vector<int>> AvlStudentDB::snapshotEdges() const {
-  std::vector<std::vector<int>> out;
-  snapshot(root_, out);
   return out;
 }

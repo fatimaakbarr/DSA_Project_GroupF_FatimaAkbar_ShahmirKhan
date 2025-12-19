@@ -28,13 +28,11 @@ public class StudentInfoUI extends JPanel {
     private final JTextField program = field("Program (e.g. BSCS)");
     private final JTextField year = field("Year (1-8)");
 
-    private final DefaultTableModel model = new DefaultTableModel(new Object[] { "Roll", "Name", "Program", "Year" }, 0) {
+    private final DefaultTableModel model = new DefaultTableModel(new Object[] { "Roll", "Name", "Program", "Semester", "Present", "Total", "%" }, 0) {
         @Override
         public boolean isCellEditable(int row, int column) { return false; }
     };
     private final JTable table = new JTable(model);
-
-    private final TreeView tree = new TreeView();
 
     public StudentInfoUI(NativeBridge nb, JLayeredPane layers) {
         this.nb = nb;
@@ -90,19 +88,23 @@ public class StudentInfoUI extends JPanel {
         JPanel form = new CardPanel();
         form.setLayout(new GridBagLayout());
 
-        JLabel hint = new JLabel("Roll = unique key (AVL). Save inserts/updates. Search loads by roll. Delete removes by roll.");
+        JLabel hint = new JLabel("Roll is unique (AVL key). Add prevents overwrite. Search is O(log n). List is AVL in-order sorted.");
         hint.setForeground(Theme.MUTED);
         hint.setFont(hint.getFont().deriveFont(Font.PLAIN, 12f));
 
-        ModernButton save = new ModernButton("Save", Theme.ACCENT, Theme.ACCENT_2);
+        ModernButton save = new ModernButton("Add Student", Theme.ACCENT, Theme.ACCENT_2);
         ModernButton search = new ModernButton("Search", Theme.CARD, Theme.CARD_2);
         ModernButton del = new ModernButton("Delete", Theme.DANGER, Theme.ACCENT);
         ModernButton refresh = new ModernButton("Refresh", Theme.CARD, Theme.CARD_2);
+        ModernButton imp = new ModernButton("Import CSV", Theme.CARD, Theme.CARD_2);
+        ModernButton exp = new ModernButton("Export CSV", Theme.CARD, Theme.CARD_2);
 
         save.addActionListener(e -> save());
         search.addActionListener(e -> search());
         del.addActionListener(e -> delete());
         refresh.addActionListener(e -> refresh());
+        imp.addActionListener(e -> importCsv());
+        exp.addActionListener(e -> exportCsv());
 
         // Field labels (so students understand what each field is for)
         JLabel lRoll = label("Roll Number");
@@ -116,12 +118,14 @@ public class StudentInfoUI extends JPanel {
         year.setToolTipText("Year/Semester number (1-8).");
 
         // Button grid (always aligned)
-        JPanel buttons = new JPanel(new GridLayout(2, 2, 10, 10));
+        JPanel buttons = new JPanel(new GridLayout(3, 2, 10, 10));
         buttons.setOpaque(false);
         buttons.add(save);
         buttons.add(search);
         buttons.add(del);
         buttons.add(refresh);
+        buttons.add(imp);
+        buttons.add(exp);
 
         GridBagConstraints gc = new GridBagConstraints();
         gc.gridx = 0;
@@ -182,18 +186,8 @@ public class StudentInfoUI extends JPanel {
         listCard.add(tl, BorderLayout.NORTH);
         listCard.add(sp, BorderLayout.CENTER);
 
-        JPanel treeCard = new CardPanel();
-        treeCard.setLayout(new BorderLayout());
-        JLabel tv = new JLabel("AVL Visualization");
-        tv.setBorder(BorderFactory.createEmptyBorder(10, 12, 8, 12));
-        tv.setForeground(Theme.TEXT);
-        tv.setFont(tv.getFont().deriveFont(Font.BOLD, 13f));
-        treeCard.add(tv, BorderLayout.NORTH);
-        treeCard.add(tree, BorderLayout.CENTER);
-
         p.add(form);
         p.add(listCard);
-        p.add(treeCard);
 
         p.addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
@@ -202,12 +196,8 @@ public class StudentInfoUI extends JPanel {
                 int h = p.getHeight();
 
                 int leftW = Math.max(340, (int) (w * 0.40));
-                int formH = 360;
-                int gap = 14;
-                form.setBounds(0, 0, leftW, formH);
-                listCard.setBounds(0, formH + gap, leftW, h - (formH + gap));
-
-                treeCard.setBounds(leftW + 16, 0, w - leftW - 16, h);
+                form.setBounds(0, 0, leftW, h);
+                listCard.setBounds(leftW + 16, 0, w - leftW - 16, h);
             }
         });
 
@@ -234,32 +224,34 @@ public class StudentInfoUI extends JPanel {
         if (n.length() > 50) { Toast.show(layers, "Name is too long (max 50 chars).", Theme.DANGER); return; }
         if (p.length() > 20) { Toast.show(layers, "Program is too long (max 20 chars).", Theme.DANGER); return; }
 
-        // Safety: confirm overwrite if roll already exists
-        String existingJson = nb.sisGetStudent(r);
-        boolean exists = existingJson != null && !existingJson.trim().isEmpty();
-        if (exists) {
-            Map<String, String> ex = JsonMini.obj(existingJson);
-            String oldName = JsonMini.asString(ex.get("name"));
-            String oldProg = JsonMini.asString(ex.get("program"));
-            int oldYear = JsonMini.asInt(ex.get("year"), -1);
-
-            String msg = "Roll " + r + " already exists.\n\n"
-                    + "Current: " + oldName + " | " + oldProg + " | Year " + oldYear + "\n"
-                    + "New:      " + n + " | " + p + " | Year " + y + "\n\n"
-                    + "Do you want to overwrite this record?";
-
-            boolean ok = GlassConfirm.confirm(this, "Confirm overwrite", msg, "Overwrite", "Cancel");
-            if (!ok) {
-                Toast.show(layers, "Update cancelled. No changes made.", Theme.MUTED);
-                return;
-            }
-        }
-
         String res = nb.sisUpsertStudent(r, n, p, y);
         Map<String, String> o = JsonMini.obj(res);
-        Toast.show(layers, "Student " + JsonMini.asString(o.getOrDefault("action", "saved")) + ".", Theme.OK);
+        if (JsonMini.asBool(o.get("ok"))) Toast.show(layers, JsonMini.asString(o.getOrDefault("message", "Student added.")), Theme.OK);
+        else Toast.show(layers, JsonMini.asString(o.getOrDefault("message", "Insert failed.")), Theme.DANGER);
         refresh();
-        highlightTree(r);
+    }
+
+    private void importCsv() {
+        javax.swing.JFileChooser fc = new javax.swing.JFileChooser();
+        fc.setDialogTitle("Import students CSV");
+        int res = fc.showOpenDialog(this);
+        if (res != javax.swing.JFileChooser.APPROVE_OPTION) return;
+        java.io.File f = fc.getSelectedFile();
+        if (f == null) return;
+        Map<String, String> o = JsonMini.obj(nb.sisImportCsv(f.getAbsolutePath()));
+        Toast.show(layers, JsonMini.asString(o.getOrDefault("message", "OK")), JsonMini.asBool(o.get("ok")) ? Theme.OK : Theme.DANGER);
+        refresh();
+    }
+
+    private void exportCsv() {
+        javax.swing.JFileChooser fc = new javax.swing.JFileChooser();
+        fc.setDialogTitle("Export students CSV");
+        int res = fc.showSaveDialog(this);
+        if (res != javax.swing.JFileChooser.APPROVE_OPTION) return;
+        java.io.File f = fc.getSelectedFile();
+        if (f == null) return;
+        Map<String, String> o = JsonMini.obj(nb.sisExportCsv(f.getAbsolutePath()));
+        Toast.show(layers, JsonMini.asString(o.getOrDefault("message", "OK")), JsonMini.asBool(o.get("ok")) ? Theme.OK : Theme.DANGER);
     }
 
     private void search() {
@@ -269,7 +261,6 @@ public class StudentInfoUI extends JPanel {
         String json = nb.sisGetStudent(r);
         if (json == null || json.trim().isEmpty()) {
             Toast.show(layers, "Student not found.", Theme.DANGER);
-            highlightTree(-1);
             return;
         }
         Map<String, String> o = JsonMini.obj(json);
@@ -277,7 +268,6 @@ public class StudentInfoUI extends JPanel {
         program.setText(JsonMini.asString(o.get("program")));
         year.setText(String.valueOf(JsonMini.asInt(o.get("year"), 1)));
         Toast.show(layers, "Record loaded.", Theme.OK);
-        highlightTree(r);
     }
 
     private void delete() {
@@ -288,27 +278,25 @@ public class StudentInfoUI extends JPanel {
         if (JsonMini.asBool(o.get("ok"))) Toast.show(layers, JsonMini.asString(o.get("message")), Theme.OK);
         else Toast.show(layers, JsonMini.asString(o.get("message")), Theme.DANGER);
         refresh();
-        highlightTree(-1);
     }
 
     private void refresh() {
         model.setRowCount(0);
         List<Map<String, String>> arr = JsonMini.arrObjects(nb.sisListStudents());
         for (Map<String, String> o : arr) {
+            int present = JsonMini.asInt(o.get("present"), 0);
+            int total = JsonMini.asInt(o.get("total"), 0);
+            int pct = total > 0 ? (present * 100 / total) : 0;
             model.addRow(new Object[] {
                     JsonMini.asInt(o.get("roll"), 0),
                     JsonMini.asString(o.get("name")),
                     JsonMini.asString(o.get("program")),
-                    JsonMini.asInt(o.get("year"), 1)
+                    JsonMini.asInt(o.get("year"), 1),
+                    present,
+                    total,
+                    pct
             });
         }
-        highlightTree(-1);
-    }
-
-    private void highlightTree(int rollToHighlight) {
-        String snap = nb.sisTreeSnapshot();
-        List<int[]> edges = JsonMini.arrIntTriples(snap);
-        tree.setSnapshot(edges, rollToHighlight);
     }
 
     private static JTextField field(String placeholder) {
