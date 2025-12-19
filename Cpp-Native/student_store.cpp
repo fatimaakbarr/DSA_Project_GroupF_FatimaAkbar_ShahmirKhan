@@ -1,7 +1,6 @@
 #include "student_store.h"
 
 #include <iostream>
-#include <cstdio>
 
 static inline std::string trim(const std::string& s) {
   size_t a = 0;
@@ -156,21 +155,24 @@ StoreResult StudentStore::addStudent(const StudentRecord& r) {
 }
 
 StoreResult StudentStore::rewriteAll(const std::vector<StudentRecord>& all) const {
-  std::string tmp = path_ + ".tmp";
-  std::ofstream out(tmp.c_str(), std::ios::out);
-  if (!out.good()) return StoreResult{false, "Failed to write temp file."};
+  // Course header restrictions: avoid filesystem ops (rename/remove).
+  // Safe-ish rewrite:
+  // 1) write a .bak snapshot first (so recovery is possible)
+  // 2) then overwrite the main file in one pass
+  std::string bak = path_ + ".bak";
+  {
+    std::ofstream bout(bak.c_str(), std::ios::out | std::ios::trunc);
+    if (!bout.good()) return StoreResult{false, "Failed to write backup file."};
+    bout << "roll,name,program,semester,present,total\n";
+    for (size_t i = 0; i < all.size(); i++) bout << toLine(all[i]);
+    bout.close();
+  }
 
+  std::ofstream out(path_.c_str(), std::ios::out | std::ios::trunc);
+  if (!out.good()) return StoreResult{false, "Failed to rewrite data file."};
   out << "roll,name,program,semester,present,total\n";
-  for (size_t i = 0; i < all.size(); i++) {
-    out << toLine(all[i]);
-  }
+  for (size_t i = 0; i < all.size(); i++) out << toLine(all[i]);
   out.close();
-
-  // replace
-  std::remove(path_.c_str());
-  if (std::rename(tmp.c_str(), path_.c_str()) != 0) {
-    return StoreResult{false, "Failed to replace data file."};
-  }
   return StoreResult{true, "OK"};
 }
 

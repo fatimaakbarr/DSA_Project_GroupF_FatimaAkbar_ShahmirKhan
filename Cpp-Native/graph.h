@@ -27,6 +27,10 @@ class CampusGraph {
   bool addLocation(const std::string& name);
   bool addEdge(const std::string& a, const std::string& b, int w);
 
+  // Exposed for building UI explanations (edge weights along a path).
+  bool resolve(const std::string& name, int& idx) const;
+  int edgeWeight(int fromIdx, int toIdx) const;
+
   PathResult bfsShortestPath(const std::string& src, const std::string& dst);
   PathResult dijkstraShortestPath(const std::string& src, const std::string& dst);
 
@@ -38,6 +42,5 @@ class CampusGraph {
   std::vector<std::string> nameOf_;
   std::vector<dsa::LinkedList<Edge>> adj_;
 
-  bool resolve(const std::string& name, int& idx) const;
-  int edgeWeight(int fromIdx, int toIdx) const;
+  // (kept as public above)
 };

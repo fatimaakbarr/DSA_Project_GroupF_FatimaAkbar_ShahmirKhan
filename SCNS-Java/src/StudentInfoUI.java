@@ -18,6 +18,10 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DocumentFilter;
 
 public class StudentInfoUI extends JPanel {
     private final NativeBridge nb;
@@ -26,7 +30,7 @@ public class StudentInfoUI extends JPanel {
     private final JTextField roll = field("Roll (e.g. 101)");
     private final JTextField name = field("Name");
     private final JTextField program = field("Program (e.g. BSCS)");
-    private final JTextField year = field("Year (1-8)");
+    private final JTextField year = field("Semester (1-8)");
 
     private final DefaultTableModel model = new DefaultTableModel(new Object[] { "Roll", "Name", "Program", "Semester", "Present", "Total", "%" }, 0) {
         @Override
@@ -42,6 +46,12 @@ public class StudentInfoUI extends JPanel {
         setLayout(null);
 
         UIStyle.table(table);
+
+        // Input hardening (prevents strings in numeric fields)
+        applyNumericFilter(roll, 9);  // roll up to 9 digits
+        applyNumericFilter(year, 1);  // semester 1 digit (1-8)
+        applyTokenFilter(program, 20); // letters/spaces/dash only
+        applyNameFilter(name, 50);     // letters/spaces/dot only
 
         JComponent header = header();
         JComponent body = body();
@@ -212,15 +222,15 @@ public class StudentInfoUI extends JPanel {
     }
 
     private void save() {
-        int r = parseInt(roll.getText(), -1);
-        int y = parseInt(year.getText(), 1);
+        Integer r = parseIntStrict(roll.getText());
+        Integer y = parseIntStrict(year.getText());
         String n = name.getText().trim();
-        String p = program.getText().trim();
+        String p = program.getText().trim().toUpperCase();
 
-        if (r <= 0) { Toast.show(layers, "Invalid roll number (must be a positive integer).", Theme.DANGER); return; }
+        if (r == null || r <= 0) { Toast.show(layers, "Invalid roll number (digits only).", Theme.DANGER); return; }
         if (n.isEmpty()) { Toast.show(layers, "Name is required.", Theme.DANGER); return; }
         if (p.isEmpty()) { Toast.show(layers, "Program is required.", Theme.DANGER); return; }
-        if (y < 1 || y > 8) { Toast.show(layers, "Year/Semester must be between 1 and 8.", Theme.DANGER); return; }
+        if (y == null || y < 1 || y > 8) { Toast.show(layers, "Semester must be a number between 1 and 8.", Theme.DANGER); return; }
         if (n.length() > 50) { Toast.show(layers, "Name is too long (max 50 chars).", Theme.DANGER); return; }
         if (p.length() > 20) { Toast.show(layers, "Program is too long (max 20 chars).", Theme.DANGER); return; }
 
@@ -255,8 +265,8 @@ public class StudentInfoUI extends JPanel {
     }
 
     private void search() {
-        int r = parseInt(roll.getText(), -1);
-        if (r <= 0) { Toast.show(layers, "Enter a roll to search.", Theme.DANGER); return; }
+        Integer r = parseIntStrict(roll.getText());
+        if (r == null || r <= 0) { Toast.show(layers, "Enter a valid numeric roll to search.", Theme.DANGER); return; }
 
         String json = nb.sisGetStudent(r);
         if (json == null || json.trim().isEmpty()) {
@@ -271,8 +281,8 @@ public class StudentInfoUI extends JPanel {
     }
 
     private void delete() {
-        int r = parseInt(roll.getText(), -1);
-        if (r <= 0) { Toast.show(layers, "Enter a roll to delete.", Theme.DANGER); return; }
+        Integer r = parseIntStrict(roll.getText());
+        if (r == null || r <= 0) { Toast.show(layers, "Enter a valid numeric roll to delete.", Theme.DANGER); return; }
         String json = nb.sisDeleteStudent(r);
         Map<String, String> o = JsonMini.obj(json);
         if (JsonMini.asBool(o.get("ok"))) Toast.show(layers, JsonMini.asString(o.get("message")), Theme.OK);
@@ -311,12 +321,82 @@ public class StudentInfoUI extends JPanel {
         return f;
     }
 
-    private static int parseInt(String s, int def) {
+    private static Integer parseIntStrict(String s) {
         try {
-            return Integer.parseInt(s.trim());
+            String t = s == null ? "" : s.trim();
+            if (t.isEmpty()) return null;
+            return Integer.parseInt(t);
         } catch (Exception e) {
-            return def;
+            return null;
         }
+    }
+
+    private static void applyNumericFilter(JTextField f, int maxLen) {
+        ((AbstractDocument) f.getDocument()).setDocumentFilter(new DocumentFilter() {
+            @Override
+            public void insertString(FilterBypass fb, int offset, String string, AttributeSet attr) throws BadLocationException {
+                replace(fb, offset, 0, string, attr);
+            }
+
+            @Override
+            public void replace(FilterBypass fb, int offset, int length, String text, AttributeSet attrs) throws BadLocationException {
+                if (text == null) text = "";
+                String cur = fb.getDocument().getText(0, fb.getDocument().getLength());
+                String next = cur.substring(0, offset) + text + cur.substring(offset + length);
+                if (next.length() > maxLen) return;
+                for (int i = 0; i < text.length(); i++) {
+                    char c = text.charAt(i);
+                    if (c < '0' || c > '9') return;
+                }
+                super.replace(fb, offset, length, text, attrs);
+            }
+        });
+    }
+
+    private static void applyTokenFilter(JTextField f, int maxLen) {
+        ((AbstractDocument) f.getDocument()).setDocumentFilter(new DocumentFilter() {
+            @Override
+            public void insertString(FilterBypass fb, int offset, String string, AttributeSet attr) throws BadLocationException {
+                replace(fb, offset, 0, string, attr);
+            }
+
+            @Override
+            public void replace(FilterBypass fb, int offset, int length, String text, AttributeSet attrs) throws BadLocationException {
+                if (text == null) text = "";
+                String cur = fb.getDocument().getText(0, fb.getDocument().getLength());
+                String next = cur.substring(0, offset) + text + cur.substring(offset + length);
+                if (next.length() > maxLen) return;
+                for (int i = 0; i < text.length(); i++) {
+                    char c = text.charAt(i);
+                    boolean ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == ' ' || c == '-' ;
+                    if (!ok) return;
+                }
+                super.replace(fb, offset, length, text, attrs);
+            }
+        });
+    }
+
+    private static void applyNameFilter(JTextField f, int maxLen) {
+        ((AbstractDocument) f.getDocument()).setDocumentFilter(new DocumentFilter() {
+            @Override
+            public void insertString(FilterBypass fb, int offset, String string, AttributeSet attr) throws BadLocationException {
+                replace(fb, offset, 0, string, attr);
+            }
+
+            @Override
+            public void replace(FilterBypass fb, int offset, int length, String text, AttributeSet attrs) throws BadLocationException {
+                if (text == null) text = "";
+                String cur = fb.getDocument().getText(0, fb.getDocument().getLength());
+                String next = cur.substring(0, offset) + text + cur.substring(offset + length);
+                if (next.length() > maxLen) return;
+                for (int i = 0; i < text.length(); i++) {
+                    char c = text.charAt(i);
+                    boolean ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == ' ' || c == '.' ;
+                    if (!ok) return;
+                }
+                super.replace(fb, offset, length, text, attrs);
+            }
+        });
     }
 
     private static final class CardPanel extends JPanel {

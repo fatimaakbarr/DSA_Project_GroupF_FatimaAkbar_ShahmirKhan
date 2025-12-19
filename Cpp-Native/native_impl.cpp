@@ -177,6 +177,18 @@ JNIEXPORT jstring JNICALL Java_NativeBridge_navShortestPath(JNIEnv* env, jobject
   std::vector<std::string> visQuoted;
   for (const auto& s : pr.visitedOrder) visQuoted.push_back(jsonutil::quote(s));
 
+  // Edge weights along the returned path (for UI animation timing + explanation).
+  std::vector<std::string> edgeWeights;
+  if (!pr.path.empty()) {
+    for (int i = 0; i + 1 < (int)pr.path.size(); i++) {
+      int ai, bi;
+      if (!(g ? g->resolve(pr.path[(size_t)i], ai) : local.resolve(pr.path[(size_t)i], ai))) { edgeWeights.push_back("0"); continue; }
+      if (!(g ? g->resolve(pr.path[(size_t)i + 1], bi) : local.resolve(pr.path[(size_t)i + 1], bi))) { edgeWeights.push_back("0"); continue; }
+      int w = (g ? g->edgeWeight(ai, bi) : local.edgeWeight(ai, bi));
+      edgeWeights.push_back(std::to_string(w < 0 ? 0 : w));
+    }
+  }
+
   std::vector<Kv> kv;
   kv.push_back(Kv{"ok", "true"});
   kv.push_back(Kv{"algorithm", jsonutil::quote(pr.algorithm)});
@@ -185,6 +197,7 @@ JNIEXPORT jstring JNICALL Java_NativeBridge_navShortestPath(JNIEnv* env, jobject
   kv.push_back(Kv{"cost", std::to_string(pr.cost)});
   kv.push_back(Kv{"path", jsonutil::arr(pathQuoted)});
   kv.push_back(Kv{"visited", jsonutil::arr(visQuoted)});
+  kv.push_back(Kv{"edgeWeights", jsonutil::arr(edgeWeights)});
   std::string out = jsonutil::obj(kv);
   return env->NewStringUTF(out.c_str());
 }

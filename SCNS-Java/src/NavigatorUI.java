@@ -19,6 +19,7 @@ public class NavigatorUI extends JPanel {
 
     private final JLabel out = new JLabel("Pick two locations to compute the shortest route.");
     private final JLabel compare = new JLabel(" ");
+    private final JLabel explain = new JLabel(" ");
     private final ChipRow chips = new ChipRow();
     private final GraphView graph = new GraphView();
 
@@ -79,8 +80,8 @@ public class NavigatorUI extends JPanel {
         JPanel p = new JPanel(null);
         p.setOpaque(false);
 
-        JPanel top = new RoundedCard();
-        top.setLayout(null);
+        JPanel controls = new RoundedCard();
+        controls.setLayout(null);
 
         JLabel l1 = new JLabel("From");
         l1.setForeground(Theme.MUTED);
@@ -95,11 +96,13 @@ public class NavigatorUI extends JPanel {
             algorithm = "BFS";
             setAlgoButtons(bBfs, bDij);
             out.setText("Fewest Stops (BFS)   •   Pick two locations and click Compute Route.");
+            explain.setText("<html><b>BFS</b> minimizes number of stops (edges). Ignores weights.</html>");
         });
         bDij.addActionListener(e -> {
             algorithm = "Dijkstra";
             setAlgoButtons(bBfs, bDij);
             out.setText("Shortest Distance (Dijkstra)   •   Pick two locations and click Compute Route.");
+            explain.setText("<html><b>Dijkstra</b> minimizes total walking cost (sum of edge weights).</html>");
         });
 
         ModernButton run = new ModernButton("Compute Route", Theme.ACCENT, Theme.ACCENT_2);
@@ -112,25 +115,29 @@ public class NavigatorUI extends JPanel {
         out.setBorder(BorderFactory.createEmptyBorder(0, 12, 0, 0));
         compare.setForeground(Theme.MUTED);
         compare.setBorder(BorderFactory.createEmptyBorder(0, 12, 0, 0));
+        explain.setForeground(Theme.MUTED);
+        explain.setBorder(BorderFactory.createEmptyBorder(0, 12, 0, 0));
+        explain.setText("<html><b>Dijkstra</b> minimizes total walking cost (sum of edge weights).</html>");
 
-        top.add(l1);
-        top.add(l2);
-        top.add(src);
-        top.add(dst);
-        top.add(bBfs);
-        top.add(bDij);
-        top.add(run);
-        top.add(cmp);
-        top.add(out);
-        top.add(compare);
-        top.add(chips);
+        controls.add(l1);
+        controls.add(l2);
+        controls.add(src);
+        controls.add(dst);
+        controls.add(bBfs);
+        controls.add(bDij);
+        controls.add(run);
+        controls.add(cmp);
+        controls.add(out);
+        controls.add(compare);
+        controls.add(explain);
+        controls.add(chips);
 
         graph.setPreferredSize(new Dimension(10, 10));
         JPanel graphWrap = new JPanel(new BorderLayout());
         graphWrap.setOpaque(false);
         graphWrap.add(graph, BorderLayout.CENTER);
 
-        p.add(top);
+        p.add(controls);
         p.add(graphWrap);
 
         p.addComponentListener(new java.awt.event.ComponentAdapter() {
@@ -138,22 +145,31 @@ public class NavigatorUI extends JPanel {
             public void componentResized(java.awt.event.ComponentEvent e) {
                 int w = p.getWidth();
                 int h = p.getHeight();
-                top.setBounds(0, 0, w, 132);
-                graphWrap.setBounds(0, 146, w, h - 146);
+                int leftW = Math.max(420, (int) (w * 0.40));
+                controls.setBounds(0, 0, leftW, h);
+                graphWrap.setBounds(leftW + 16, 0, w - leftW - 16, h);
 
-                l1.setBounds(18, 18, 80, 18);
-                src.setBounds(18, 40, 220, 34);
-                l2.setBounds(252, 18, 80, 18);
-                dst.setBounds(252, 40, 220, 34);
+                int cx = 18;
+                chips.setBounds(cx, 10, leftW - 36, 24);
 
-                bBfs.setBounds(w - 360, 38, 76, 36);
-                bDij.setBounds(w - 276, 38, 110, 36);
+                l1.setBounds(cx, 46, 120, 18);
+                src.setBounds(cx, 68, leftW - 36, 36);
+                l2.setBounds(cx, 112, 120, 18);
+                dst.setBounds(cx, 134, leftW - 36, 36);
 
-                cmp.setBounds(w - 260, 84, 96, 34);
-                run.setBounds(w - 152, 38, 140, 36);
-                out.setBounds(18, 88, w - 290, 22);
-                compare.setBounds(18, 108, w - 36, 18);
-                chips.setBounds(18, 8, w - 36, 22);
+                int toggleY = 184;
+                int toggleH = 38;
+                int gap = 10;
+                int bw = (leftW - 36 - gap) / 2;
+                bBfs.setBounds(cx, toggleY, bw, toggleH);
+                bDij.setBounds(cx + bw + gap, toggleY, bw, toggleH);
+
+                run.setBounds(cx, toggleY + 52, leftW - 36, 40);
+                cmp.setBounds(cx, toggleY + 98, leftW - 36, 36);
+
+                out.setBounds(cx, toggleY + 148, leftW - 36, 22);
+                compare.setBounds(cx, toggleY + 170, leftW - 36, 18);
+                explain.setBounds(cx, toggleY + 194, leftW - 36, 46);
             }
         });
 
@@ -182,7 +198,7 @@ public class NavigatorUI extends JPanel {
         if (!JsonMini.asBool(o.get("ok"))) {
             Toast.show(layers, JsonMini.asString(o.getOrDefault("error", "Route not found.")), Theme.DANGER);
             out.setText("No route found.");
-            graph.animateResult(java.util.Collections.emptyList(), java.util.Collections.emptyList());
+            graph.animateTraversal(java.util.Collections.emptyList(), java.util.Collections.emptyList(), java.util.Collections.emptyList(), algorithm);
             return;
         }
 
@@ -190,6 +206,7 @@ public class NavigatorUI extends JPanel {
         int cost = JsonMini.asInt(o.get("cost"), -1);
         java.util.List<String> path = JsonMini.arrStrings(o.get("path"));
         java.util.List<String> visited = JsonMini.arrStrings(o.get("visited"));
+        java.util.List<Integer> edgeW = JsonMini.arrInts(o.get("edgeWeights"));
 
         if ("BFS".equals(JsonMini.asString(o.get("algorithm")))) {
             out.setText("BFS: hops " + hops + " • cost " + cost + "   •   Path: " + String.join(" → ", path));
@@ -200,7 +217,13 @@ public class NavigatorUI extends JPanel {
         chips.setChips(new String[] { "Visited: " + visited.size(), "Hops: " + hops, "Cost: " + cost },
                 new java.awt.Color[] { Theme.ACCENT_2, Theme.CARD_2, Theme.CARD_2 });
         graph.setMode(algorithm);
-        graph.animateResult(path, visited);
+        graph.animateTraversal(path, visited, edgeW, algorithm);
+
+        if ("BFS".equals(algorithm)) {
+            explain.setText("<html><b>Why this route?</b><br/>BFS minimizes number of locations passed (hops).<br/>It may ignore a shorter walking-time route.</html>");
+        } else {
+            explain.setText("<html><b>Why this route?</b><br/>Dijkstra minimizes total walking cost (sum of edge weights).<br/>It may take more stops if the total is smaller.</html>");
+        }
     }
 
     private void compare() {
