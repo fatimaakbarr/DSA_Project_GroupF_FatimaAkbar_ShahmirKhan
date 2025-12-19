@@ -8,7 +8,6 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.Window;
 
-import javax.swing.BorderFactory;
 import javax.swing.JComponent;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
@@ -22,13 +21,13 @@ public final class GlassConfirm {
     public static boolean confirm(Component parent, String title, String message, String okText, String cancelText) {
         Window owner = parent == null ? null : SwingUtilities.getWindowAncestor(parent);
         ConfirmDialog d = new ConfirmDialog(owner, title, message, okText, cancelText);
-        d.open();
+        d.setLocationRelativeTo(owner);
+        d.setVisible(true);
         return d.result;
     }
 
     private static final class ConfirmDialog extends JDialog {
         private boolean result = false;
-
         private float alpha = 0f;
         private float scale = 0.98f;
 
@@ -41,27 +40,17 @@ public final class GlassConfirm {
 
             View view = new View(title, message, okText, cancelText);
             setContentPane(view);
-            pack();
-            setLocationRelativeTo(owner);
+            setSize(new Dimension(740, 520));
 
             view.onOk = () -> close(true);
             view.onCancel = () -> close(false);
 
-            // ESC to cancel
             getRootPane().registerKeyboardAction(e -> close(false),
                     javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
                     JComponent.WHEN_IN_FOCUSED_WINDOW);
-        }
 
-        void open() {
-            // Fade in
+            // animate in
             try { setOpacity(0f); } catch (Throwable ignored) {}
-            setVisible(true);
-        }
-
-        private void animateIn() {
-            alpha = 0f;
-            scale = 0.98f;
             Anim.run(180, 60, t -> {
                 alpha = (float) Anim.easeOutCubic(t);
                 scale = (float) (0.98 + 0.02 * Anim.easeOutCubic(t));
@@ -71,7 +60,6 @@ public final class GlassConfirm {
         }
 
         private void close(boolean ok) {
-            // Fade out
             float startA = alpha;
             float startS = scale;
             Anim.run(140, 60, t -> {
@@ -85,14 +73,6 @@ public final class GlassConfirm {
                 setVisible(false);
                 dispose();
             });
-        }
-
-        @Override
-        public void setVisible(boolean b) {
-            if (b) {
-                animateIn();
-            }
-            super.setVisible(b);
         }
 
         private final class View extends JPanel {
@@ -109,9 +89,7 @@ public final class GlassConfirm {
                 this.message = message;
                 this.okText = okText;
                 this.cancelText = cancelText;
-
                 setOpaque(false);
-                setPreferredSize(new Dimension(560, 300));
                 setLayout(null);
 
                 JLabel t = new JLabel(title);
@@ -138,16 +116,14 @@ public final class GlassConfirm {
                     @Override
                     public void componentResized(java.awt.event.ComponentEvent e) {
                         int w = getWidth();
-                        int pad = 28;
+                        int pad = 56;
                         t.setBounds(pad, pad, w - pad * 2, 28);
-                        m.setBounds(pad, pad + 34, w - pad * 2, 150);
-                        int by = getHeight() - 58;
-                        cancel.setBounds(w - pad - 120 - 140, by, 120, 38);
-                        ok.setBounds(w - pad - 140, by, 140, 38);
+                        m.setBounds(pad, pad + 38, w - pad * 2, 260);
+                        int by = getHeight() - 110;
+                        cancel.setBounds(w - pad - 120 - 150, by, 120, 40);
+                        ok.setBounds(w - pad - 150, by, 150, 40);
                     }
                 });
-
-                setBorder(BorderFactory.createEmptyBorder(18, 18, 18, 18));
             }
 
             @Override
@@ -159,13 +135,13 @@ public final class GlassConfirm {
                 int h = getHeight();
 
                 // Dim background
-                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.55f * alpha));
-                g2.setColor(new Color(0, 0, 0));
+                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.58f * alpha));
+                g2.setColor(Color.BLACK);
                 g2.fillRect(0, 0, w, h);
 
                 // Card
-                int cw = 560;
-                int ch = 300;
+                int cw = 620;
+                int ch = 360;
                 int cx = (w - cw) / 2;
                 int cy = (h - ch) / 2;
 
