@@ -7,8 +7,12 @@ import java.awt.GradientPaint;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.geom.AffineTransform;
 import java.awt.geom.Ellipse2D;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.Random;
+import java.util.function.Consumer;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -24,6 +28,7 @@ public class SmartCampusFrame extends JFrame {
     private final JLayeredPane layers = new JLayeredPane();
 
     private final AnimatedSwitcher switcher = new AnimatedSwitcher();
+    private SidebarNav sidebarNav; // for syncing Home cards with sidebar selection
 
     public SmartCampusFrame(NativeBridge nb) {
         super("SmartCampus DSA Project");
@@ -85,7 +90,10 @@ public class SmartCampusFrame extends JFrame {
             add(switcher, BorderLayout.CENTER);
 
             // screens
-            HomePanel home = new HomePanel(nb);
+            HomePanel home = new HomePanel(nb, key -> {
+                if (sidebarNav != null) sidebarNav.selectKey(key);
+                switcher.switchTo(key);
+            });
             NavigatorUI nav = new NavigatorUI(nb, layers);
             StudentInfoUI sis = new StudentInfoUI(nb, layers);
             AttendanceUI att = new AttendanceUI(nb, layers);
@@ -143,10 +151,10 @@ public class SmartCampusFrame extends JFrame {
         side.add(brand);
         side.add(Box.createVerticalStrut(18));
 
-        SidebarNav nav = new SidebarNav();
-        nav.setMaximumSize(new Dimension(1000, 260));
-        nav.setPreferredSize(new Dimension(220, 220));
-        side.add(nav);
+        sidebarNav = new SidebarNav();
+        sidebarNav.setMaximumSize(new Dimension(1000, 260));
+        sidebarNav.setPreferredSize(new Dimension(220, 220));
+        side.add(sidebarNav);
 
         side.add(Box.createVerticalGlue());
 
@@ -189,6 +197,13 @@ public class SmartCampusFrame extends JFrame {
             bNav.addActionListener(e -> { select(bNav, true); switcher.switchTo("nav"); });
             bSIS.addActionListener(e -> { select(bSIS, true); switcher.switchTo("sis"); });
             bAtt.addActionListener(e -> { select(bAtt, true); switcher.switchTo("att"); });
+        }
+
+        void selectKey(String key) {
+            if ("home".equals(key)) select(bHome, true);
+            else if ("nav".equals(key)) select(bNav, true);
+            else if ("sis".equals(key)) select(bSIS, true);
+            else if ("att".equals(key)) select(bAtt, true);
         }
 
         private void select(ModernButton b, boolean animate) {
@@ -424,34 +439,83 @@ class AnimatedSwitcher extends JPanel {
 }
 
 class HomePanel extends JPanel {
-    HomePanel(NativeBridge nb) {
+    HomePanel(NativeBridge nb, Consumer<String> onOpen) {
         setOpaque(false);
         setLayout(null);
 
-        JComponent hero = new Hero(nb);
-        add(hero);
+        JComponent dash = new Dashboard(nb, onOpen);
+        add(dash);
 
         addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
             public void componentResized(java.awt.event.ComponentEvent e) {
-                hero.setBounds(24, 24, getWidth() - 48, getHeight() - 48);
+                dash.setBounds(24, 24, getWidth() - 48, getHeight() - 48);
             }
         });
     }
 
-    private static final class Hero extends JComponent {
+    private static final class Dashboard extends JComponent {
         private final String status;
-        private float t = 0f;
-        private final javax.swing.Timer anim;
+        private final Consumer<String> onOpen;
 
-        Hero(NativeBridge nb) {
+        private float dim = 1f;
+        private float t = 0f;
+        private final javax.swing.Timer bg;
+
+        private final HomeCard cNav;
+        private final HomeCard cSis;
+        private final HomeCard cAtt;
+
+        Dashboard(NativeBridge nb, Consumer<String> onOpen) {
             setOpaque(false);
             this.status = nb.testConnection();
-            anim = new javax.swing.Timer(16, e -> {
-                t += 0.018f;
-                repaint();
+            this.onOpen = onOpen;
+
+            setLayout(null);
+            cNav = new HomeCard("Campus Navigator", "Algorithm race: BFS vs Dijkstra", "nav");
+            cSis = new HomeCard("Student Records", "File cabinet + CSV persistence", "sis");
+            cAtt = new HomeCard("Attendance", "Live ring + defaulters", "att");
+            add(cNav);
+            add(cSis);
+            add(cAtt);
+
+            // Pop-in sequence
+            cNav.setAppear(0f);
+            cSis.setAppear(0f);
+            cAtt.setAppear(0f);
+            javax.swing.Timer seq = new javax.swing.Timer(30, null);
+            seq.addActionListener(e -> {
+                seq.stop();
+                Anim.run(520, 60, tt -> cNav.setAppear((float) Anim.easeOutBack(tt)), null);
+                new javax.swing.Timer(120, e2 -> {
+                    ((javax.swing.Timer) e2.getSource()).stop();
+                    Anim.run(520, 60, tt -> cSis.setAppear((float) Anim.easeOutBack(tt)), null);
+                }).start();
+                new javax.swing.Timer(240, e3 -> {
+                    ((javax.swing.Timer) e3.getSource()).stop();
+                    Anim.run(520, 60, tt -> cAtt.setAppear((float) Anim.easeOutBack(tt)), null);
+                }).start();
+                Anim.run(480, 60, tt -> { dim = 1f - 0.25f * (float) Anim.easeOutCubic(tt); repaint(); }, null);
             });
-            anim.start();
+            seq.setRepeats(false);
+            seq.start();
+
+            bg = new javax.swing.Timer(16, e -> { t += 0.010f; repaint(); });
+            bg.start();
+        }
+
+        @Override
+        public void doLayout() {
+            int w = getWidth();
+            int top = 180;
+            int gap = 18;
+            int usable = Math.max(1, w - 64 - gap * 2);
+            int cardW = Math.min(360, Math.max(260, usable / 3));
+            int x0 = 32;
+            int y = top;
+            cNav.setBounds(x0, y, cardW, 170);
+            cSis.setBounds(x0 + cardW + gap, y, cardW, 170);
+            cAtt.setBounds(x0 + (cardW + gap) * 2, y, cardW, 170);
         }
 
         @Override
@@ -462,37 +526,15 @@ class HomePanel extends JPanel {
             int w = getWidth();
             int h = getHeight();
 
-            g2.setColor(new Color(0, 0, 0, 80));
+            // Dim overlay for launch vibe
+            g2.setColor(new Color(0, 0, 0, (int) (90 * dim)));
             g2.fillRoundRect(0, 0, w, h, 28, 28);
 
-            // Campus-themed animation: a \"drone\" dot surveying nodes + a glowing path pulse.
-            // (Memorable but still relevant to the navigator module.)
-            double cx = w * 0.74;
-            double cy = h * 0.58;
-            double rx = Math.max(120, w * 0.18);
-            double ry = Math.max(90, h * 0.16);
-            double ang = t;
-            double dx = cx + Math.cos(ang) * rx;
-            double dy = cy + Math.sin(ang * 1.12) * ry;
-
-            // faint orbit path
-            g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            g2.setColor(new Color(255, 255, 255, 22));
-            g2.drawOval((int) (cx - rx), (int) (cy - ry), (int) (rx * 2), (int) (ry * 2));
-
-            // pulsing scan line
-            double scanX = w * 0.52 + Math.sin(t * 0.9) * (w * 0.22);
-            g2.setColor(new Color(Theme.ACCENT_2.getRed(), Theme.ACCENT_2.getGreen(), Theme.ACCENT_2.getBlue(), 30));
-            g2.setStroke(new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            g2.drawLine((int) scanX, (int) (h * 0.22), (int) scanX, (int) (h * 0.88));
-
-            // drone glow + core
-            float pulse = (float) (0.5 + 0.5 * Math.sin(t * 2.2));
-            int ga = 70 + (int) (70 * pulse);
-            g2.setColor(new Color(Theme.ACCENT.getRed(), Theme.ACCENT.getGreen(), Theme.ACCENT.getBlue(), ga));
-            g2.fillOval((int) (dx - 14), (int) (dy - 14), 28, 28);
-            g2.setColor(new Color(255, 255, 255, 220));
-            g2.fillOval((int) (dx - 4), (int) (dy - 4), 8, 8);
+            // Calm gradient drift (no orbits)
+            int gx = (int) (w * (0.20 + 0.06 * Math.sin(t)));
+            g2.setPaint(new GradientPaint(gx, 0, new Color(Theme.ACCENT.getRed(), Theme.ACCENT.getGreen(), Theme.ACCENT.getBlue(), 26),
+                    gx + 240, 0, new Color(Theme.ACCENT_2.getRed(), Theme.ACCENT_2.getGreen(), Theme.ACCENT_2.getBlue(), 14)));
+            g2.fillRoundRect(0, 0, w, h, 28, 28);
 
             g2.setColor(Theme.TEXT);
             g2.setFont(getFont().deriveFont(Font.BOLD, 32f));
@@ -500,25 +542,111 @@ class HomePanel extends JPanel {
 
             g2.setFont(getFont().deriveFont(Font.PLAIN, 14f));
             g2.setColor(Theme.MUTED);
-            g2.drawString("SmartCampus DSA system • Java GUI + C++ DSAs via JNI", 32, 108);
+            g2.drawString("Modern DSA app • Java Swing + C++ (JNI) • Fun to demo", 32, 108);
 
             g2.setFont(getFont().deriveFont(Font.BOLD, 12.5f));
             g2.setColor(Theme.OK);
             g2.drawString(status, 32, 142);
 
-            g2.setFont(getFont().deriveFont(Font.PLAIN, 13f));
-            g2.setColor(Theme.TEXT);
-            int y = 190;
-            g2.drawString("Modules:", 32, y);
-            y += 26;
-            g2.setColor(Theme.MUTED);
-            g2.drawString("• Campus Navigator (Graph + BFS / Dijkstra)", 48, y);
-            y += 20;
-            g2.drawString("• Student Information System (AVL Tree + searching/sorting)", 48, y);
-            y += 20;
-            g2.drawString("• Attendance Management (Queue/Array + Min-Heap)", 48, y);
-
             g2.dispose();
+        }
+
+        private final class HomeCard extends JComponent {
+            private final String title;
+            private final String sub;
+            private final String key;
+
+            private float hover = 0f;
+            private float appear = 0f;
+            private float mx = 0f, my = 0f;
+
+            HomeCard(String title, String sub, String key) {
+                this.title = title;
+                this.sub = sub;
+                this.key = key;
+                setOpaque(false);
+
+                MouseAdapter ma = new MouseAdapter() {
+                    @Override
+                    public void mouseEntered(MouseEvent e) {
+                        Anim.run(220, 60, t -> { hover = (float) Anim.easeOutCubic(t); repaint(); }, null);
+                    }
+
+                    @Override
+                    public void mouseExited(MouseEvent e) {
+                        Anim.run(220, 60, t -> { hover = 1f - (float) Anim.easeOutCubic(t); mx = 0f; my = 0f; repaint(); }, null);
+                    }
+
+                    @Override
+                    public void mouseMoved(MouseEvent e) {
+                        float nx = (e.getX() - getWidth() / 2f) / Math.max(1f, getWidth() / 2f);
+                        float ny = (e.getY() - getHeight() / 2f) / Math.max(1f, getHeight() / 2f);
+                        mx = nx;
+                        my = ny;
+                        repaint();
+                    }
+
+                    @Override
+                    public void mouseClicked(MouseEvent e) {
+                        if (onOpen != null) onOpen.accept(key);
+                    }
+                };
+                addMouseListener(ma);
+                addMouseMotionListener(ma);
+            }
+
+            void setAppear(float a) { appear = a; repaint(); }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                int w = getWidth();
+                int h = getHeight();
+
+                float a = Math.max(0f, Math.min(1f, appear));
+                float s = 0.92f + 0.08f * a;
+                float lift = (1f - a) * 24f;
+
+                AffineTransform old = g2.getTransform();
+                g2.translate(w / 2.0, h / 2.0 + lift);
+                double rot = (mx) * (0.07 * hover);
+                g2.rotate(rot);
+                g2.scale(s, s);
+                g2.translate(-w / 2.0, -h / 2.0);
+
+                // shadow
+                g2.setColor(new Color(0, 0, 0, (int) (90 * a)));
+                g2.fillRoundRect(10, 14, w - 20, h - 18, 26, 26);
+
+                // glass card
+                int glowA = (int) (hover * 80);
+                g2.setColor(new Color(Theme.ACCENT.getRed(), Theme.ACCENT.getGreen(), Theme.ACCENT.getBlue(), glowA));
+                g2.fillRoundRect(8, 10, w - 16, h - 18, 26, 26);
+                g2.setColor(new Color(0, 0, 0, 95));
+                g2.fillRoundRect(8, 10, w - 16, h - 18, 26, 26);
+                g2.setColor(new Color(255, 255, 255, 22));
+                g2.drawRoundRect(8, 10, w - 17, h - 19, 26, 26);
+
+                // accent bar
+                g2.setColor(new Color(Theme.ACCENT_2.getRed(), Theme.ACCENT_2.getGreen(), Theme.ACCENT_2.getBlue(), (int) (160 * a)));
+                g2.fillRoundRect(12, 18, 6, h - 44, 10, 10);
+
+                g2.setColor(Theme.TEXT);
+                g2.setFont(getFont().deriveFont(Font.BOLD, 16f));
+                g2.drawString(title, 28, 52);
+                g2.setColor(Theme.MUTED);
+                g2.setFont(getFont().deriveFont(Font.PLAIN, 12.5f));
+                g2.drawString(sub, 28, 78);
+
+                g2.setColor(new Color(255, 255, 255, (int) (120 + 80 * hover)));
+                g2.setFont(getFont().deriveFont(Font.BOLD, 12f));
+                g2.drawString("Open →", 28, h - 34);
+
+                g2.setTransform(old);
+                g2.dispose();
+            }
         }
     }
 }

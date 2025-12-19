@@ -23,6 +23,11 @@ public class NavigatorUI extends JPanel {
     private final ChipRow chips = new ChipRow();
     private final GraphView graph = new GraphView();
 
+    // replay cache
+    private java.util.List<String> lastBfsPath, lastDijPath, lastBfsVisited, lastDijVisited;
+    private java.util.List<Integer> lastBfsEdgeW, lastDijEdgeW;
+    private String lastWinner = "Dijkstra";
+
     public NavigatorUI(NativeBridge nb, JLayeredPane layers) {
         this.nb = nb;
         this.layers = layers;
@@ -111,6 +116,15 @@ public class NavigatorUI extends JPanel {
         ModernButton cmp = new ModernButton("Compare BFS vs Dijkstra", Theme.CARD, Theme.CARD_2);
         cmp.addActionListener(e -> compare());
 
+        ModernButton replay = new ModernButton("Replay Race", Theme.CARD, Theme.CARD_2);
+        replay.addActionListener(e -> {
+            if (lastBfsPath == null || lastDijPath == null) {
+                Toast.show(layers, "Run Compare first to record a race.", Theme.MUTED);
+                return;
+            }
+            graph.animateRace(lastBfsPath, lastBfsVisited, lastBfsEdgeW, lastDijPath, lastDijVisited, lastDijEdgeW, lastWinner);
+        });
+
         out.setForeground(Theme.TEXT);
         out.setBorder(BorderFactory.createEmptyBorder(0, 12, 0, 0));
         compare.setForeground(Theme.MUTED);
@@ -127,6 +141,7 @@ public class NavigatorUI extends JPanel {
         controls.add(bDij);
         controls.add(run);
         controls.add(cmp);
+        controls.add(replay);
         controls.add(out);
         controls.add(compare);
         controls.add(explain);
@@ -167,9 +182,10 @@ public class NavigatorUI extends JPanel {
                 run.setBounds(cx, toggleY + 52, leftW - 36, 40);
                 cmp.setBounds(cx, toggleY + 98, leftW - 36, 36);
 
-                out.setBounds(cx, toggleY + 148, leftW - 36, 22);
-                compare.setBounds(cx, toggleY + 170, leftW - 36, 18);
-                explain.setBounds(cx, toggleY + 194, leftW - 36, 46);
+                replay.setBounds(cx, toggleY + 140, leftW - 36, 34);
+                out.setBounds(cx, toggleY + 180, leftW - 36, 22);
+                compare.setBounds(cx, toggleY + 202, leftW - 36, 18);
+                explain.setBounds(cx, toggleY + 226, leftW - 36, 46);
             }
         });
 
@@ -271,6 +287,15 @@ public class NavigatorUI extends JPanel {
         explain.setText("<html><b>Why do they differ?</b><br/>"
                 + "BFS chooses the route with <b>fewest stops</b> (hops = " + bfsHops + ").<br/>"
                 + "Dijkstra chooses the route with <b>lowest total cost</b> (cost = " + dijCost + ").</html>");
+
+        // cache for replay
+        lastBfsPath = bfsPath;
+        lastDijPath = dijPath;
+        lastBfsVisited = bfsVisited;
+        lastDijVisited = dijVisited;
+        lastBfsEdgeW = bfsEdgeW;
+        lastDijEdgeW = dijEdgeW;
+        lastWinner = winner;
 
         graph.animateRace(bfsPath, bfsVisited, bfsEdgeW, dijPath, dijVisited, dijEdgeW, winner);
     }

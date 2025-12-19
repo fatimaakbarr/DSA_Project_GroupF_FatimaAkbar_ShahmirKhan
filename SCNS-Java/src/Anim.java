@@ -16,6 +16,14 @@ public final class Anim {
         return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2.0;
     }
 
+    // Slightly playful \"pop\" (for dashboard cards).
+    public static double easeOutBack(double t) {
+        t = clamp01(t);
+        double c1 = 1.70158;
+        double c3 = c1 + 1.0;
+        return 1.0 + c3 * Math.pow(t - 1.0, 3) + c1 * Math.pow(t - 1.0, 2);
+    }
+
     public static double clamp01(double t) {
         return Math.max(0.0, Math.min(1.0, t));
     }
